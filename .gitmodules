@@ -1,3 +1,6 @@
 [submodule "third_party/pico-sdk"]
 	path = third_party/pico-sdk
 	url = https://github.com/raspberrypi/pico-sdk.git
+[submodule "third_party/pico-tflmicro"]
+	path = third_party/pico-tflmicro
+	url = https://github.com/raspberrypi/pico-tflmicro.git
