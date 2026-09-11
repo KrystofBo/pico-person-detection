@@ -63,3 +63,34 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+---
+
+# Project: person detection on Raspberry Pi Pico 2
+
+## Goal
+A person / no-person image classifier that runs inference on a Raspberry Pi Pico 2.
+No camera yet: images are embedded in firmware or streamed from the host over USB serial.
+First prove the pipeline with an existing model (TFLite Micro person detection), then train our own smaller one.
+
+## Hardware & environment
+- Board: Raspberry Pi Pico 2 (RP2350, Cortex-M33 @ 150 MHz, 520 KB SRAM, 4 MB flash), `PICO_BOARD=pico2`.
+- Host: WSL2 (Ubuntu). The Pico is attached to WSL with usbipd-win, so `picotool` and `/dev/ttyACM0` work from Linux.
+- Python tooling uses a Python 3.12 venv (system Python 3.14 lacks TF/LiteRT wheels).
+
+## Layout (directories are created only when a step needs them)
+- `docs/journal/NN-title.md` - one write-up per step
+- `third_party/` - pico-sdk, pico-tflmicro as pinned git submodules
+- `firmware/` - one CMake project, one executable per experiment
+- `tools/` - host Python scripts
+- `training/` - model training (later)
+- `data/samples/` - small, licensed test images; `results/` - CSVs and summaries
+
+Build and flash commands are added here once they exist (step 1).
+
+## Workflow conventions
+- Work in numbered steps. One branch per step: `step/NN-short-name`.
+- Small, focused commits: imperative subject, body explains *why*.
+- Each step adds `docs/journal/NN-title.md` (Goal, What we did, Commands, Results, Problems & fixes, Next) and updates the progress table in `README.md`.
+- End of step: summarize the diff for review, merge to `main` with `--no-ff`, tag `step-NN`. Never push unless asked.
+- Record real measured numbers (latency, flash, arena, accuracy) in the journal and the README results table - no estimates presented as measurements.
