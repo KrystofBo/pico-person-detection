@@ -86,7 +86,8 @@ First prove the pipeline with an existing model (TFLite Micro person detection),
 - `training/` - model training (later)
 - `data/samples/` - small, licensed test images; `results/` - CSVs and summaries
 
-Build and flash commands are added here once they exist (step 1).
+## Skills
+Repeatable procedures (building, flashing, reading serial, ...) are project skills in `.claude/skills/`. Use them instead of reconstructing commands.
 
 ## Workflow conventions
 - Work in numbered steps. One branch per step: `step/NN-short-name`.

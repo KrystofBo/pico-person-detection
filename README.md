@@ -13,7 +13,7 @@ The project is built step by step. Each step has its own branch, tag and journal
 | Step | Description | Status | Journal |
 |------|-------------|--------|---------|
 | 00 | Repo foundation: conventions, docs, .gitignore | done | [00-project-setup](docs/journal/00-project-setup.md) |
-| 01 | Toolchain + "hello" firmware on the Pico 2 | planned | |
+| 01 | Toolchain + "hello" firmware on the Pico 2 | done | [01-toolchain-hello](docs/journal/01-toolchain-hello.md) |
 | 02 | External model: TFLM person detection, embedded images | planned | |
 | 03 | Host reference + USB image streaming | planned | |
 | 04 | Train our own model (host) | planned | |
