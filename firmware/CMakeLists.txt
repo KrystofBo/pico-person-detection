@@ -13,4 +13,9 @@ set(CMAKE_CXX_STANDARD 17)
 
 pico_sdk_init()
 
+# Provides the pico-tflmicro library target. EXCLUDE_FROM_ALL so its ~100
+# tests and examples are only defined, not built.
+add_subdirectory(../third_party/pico-tflmicro pico-tflmicro EXCLUDE_FROM_ALL)
+
 add_subdirectory(hello)
+add_subdirectory(person_detect_embedded)
