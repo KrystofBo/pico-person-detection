@@ -14,7 +14,7 @@ The project is built step by step. Each step has its own branch, tag and journal
 |------|-------------|--------|---------|
 | 00 | Repo foundation: conventions, docs, .gitignore | done | [00-project-setup](docs/journal/00-project-setup.md) |
 | 01 | Toolchain + "hello" firmware on the Pico 2 | done | [01-toolchain-hello](docs/journal/01-toolchain-hello.md) |
-| 02 | External model: TFLM person detection, embedded images | planned | |
+| 02 | External model: TFLM person detection, embedded images | done | [02-tflm-embedded](docs/journal/02-tflm-embedded.md) |
 | 03 | Host reference + USB image streaming | planned | |
 | 04 | Train our own model (host) | planned | |
 | 05 | Deploy our model on the Pico | planned | |
@@ -25,4 +25,4 @@ Measured on the Pico 2 unless stated otherwise.
 
 | Model | Input | Accuracy | Latency | Flash (model) | Tensor arena |
 |-------|-------|----------|---------|---------------|--------------|
-| *(filled in from step 02)* | | | | | |
+| TFLM person detection (pretrained, pico-tflmicro) | 96×96 gray int8 | not measured yet (2/2 samples correct) | 190 ms | 300,568 B | 82,308 B |
