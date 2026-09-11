@@ -26,9 +26,11 @@ Each executable ends up at `firmware/build/<target>/<target>.uf2`. `PICO_BOARD` 
 ## 3. Read serial output
 ```bash
 timeout 20 bash -c 'until [ -e /dev/ttyACM0 ]; do sleep 0.5; done'   # wait for re-enumeration
-timeout 5 cat /dev/ttyACM0
+timeout 8 cat /dev/ttyACM0 > /tmp/serial.txt; tr -d '\r' < /tmp/serial.txt
 ```
-Blank lines between messages are cosmetic: the SDK sends `\r\n` and the tty adds another newline.
+- **Don't pipe `timeout ... cat` into filters** (`| tr | grep | head`). When the timeout fires, the whole pipeline is killed (exit 143) while `tr`/`grep` still hold buffered output, so you see nothing even though the Pico printed fine. Capture to a file first, then filter it.
+- Output printed before the port is opened is lost; USB stdio doesn't buffer it. Firmware should print in a loop, or wait for a host with `PICO_STDIO_USB_CONNECT_WAIT_TIMEOUT_MS`.
+- For the user's interactive terminal: `stty -F /dev/ttyACM0 raw -echo && cat /dev/ttyACM0`. Without the `stty`, you get blank lines between messages because the SDK sends `\r\n`.
 
 ## Troubleshooting
 The Pico reaches WSL through usbipd-win. On Windows, `usbipd attach --wsl --busid 1-1 --auto-attach` must be running.
