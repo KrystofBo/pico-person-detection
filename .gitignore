@@ -216,3 +216,15 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- Project-specific ---
+# Firmware build outputs (build/ directories are already ignored above)
+*.uf2
+*.elf
+*.bin
+*.hex
+*.dis
+*.map
+
+# Training datasets are large and downloaded separately
+datasets/
