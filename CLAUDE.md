@@ -95,6 +95,9 @@ Repeatable procedures (building, flashing, reading serial, ...) are project skil
   results the fix revises. The write-up is a new section appended to that step's existing
   `docs/journal/NN-*.md`, not a new journal file, so each step's journal stays the single
   narrative for its own numbers. Merge with `--no-ff`; no tag.
+- Repo housekeeping that is neither a step nor a fix to a step's measurements - tooling, environment,
+  docs, the conventions themselves - goes on `chore/short-name`. No number, no tag, no journal entry;
+  update the affected docs directly. Merge with `--no-ff`.
 - Small, focused commits: imperative subject, body explains *why*.
 - Each step adds `docs/journal/NN-title.md` (Goal, What we did, Commands, Results, Problems & fixes, Next) and updates the progress table in `README.md`.
 - End of step: summarize the diff for review, merge to `main` with `--no-ff`, tag `step-NN`. Never push unless asked.
