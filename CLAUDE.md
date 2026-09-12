@@ -76,7 +76,7 @@ First prove the pipeline with an existing model (TFLite Micro person detection),
 ## Hardware & environment
 - Board: Raspberry Pi Pico 2 (RP2350, Cortex-M33 @ 150 MHz, 520 KB SRAM, 4 MB flash), `PICO_BOARD=pico2`.
 - Host: WSL2 (Ubuntu). The Pico is attached to WSL with usbipd-win, so `picotool` and `/dev/ttyACM0` work from Linux.
-- Python tooling uses a Python 3.12 venv (system Python 3.14 lacks TF/LiteRT wheels).
+- Python tooling uses the conda env `pico-person-detection` (Python 3.12; system Python 3.14 lacks TF/LiteRT wheels), specified in `environment.yml`. Never install into a base/system interpreter - see the `python-env` skill.
 
 ## Layout (directories are created only when a step needs them)
 - `docs/journal/NN-title.md` - one write-up per step
@@ -95,6 +95,9 @@ Repeatable procedures (building, flashing, reading serial, ...) are project skil
   results the fix revises. The write-up is a new section appended to that step's existing
   `docs/journal/NN-*.md`, not a new journal file, so each step's journal stays the single
   narrative for its own numbers. Merge with `--no-ff`; no tag.
+- Repo housekeeping that is neither a step nor a fix to a step's measurements - tooling, environment,
+  docs, the conventions themselves - goes on `chore/short-name`. No number, no tag, no journal entry;
+  update the affected docs directly. Merge with `--no-ff`.
 - Small, focused commits: imperative subject, body explains *why*.
 - Each step adds `docs/journal/NN-title.md` (Goal, What we did, Commands, Results, Problems & fixes, Next) and updates the progress table in `README.md`.
 - End of step: summarize the diff for review, merge to `main` with `--no-ff`, tag `step-NN`. Never push unless asked.
