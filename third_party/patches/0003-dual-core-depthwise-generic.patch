@@ -1,0 +1,184 @@
+diff --git a/src/third_party/cmsis_nn/Source/ConvolutionFunctions/arm_depthwise_conv_s8.c b/src/third_party/cmsis_nn/Source/ConvolutionFunctions/arm_depthwise_conv_s8.c
+index 0c67079..c9cf78d 100644
+--- a/src/third_party/cmsis_nn/Source/ConvolutionFunctions/arm_depthwise_conv_s8.c
++++ b/src/third_party/cmsis_nn/Source/ConvolutionFunctions/arm_depthwise_conv_s8.c
+@@ -31,6 +31,9 @@
+ #include "third_party/cmsis_nn/Include/arm_nnfunctions.h"
+ #include "third_party/cmsis_nn/Include/arm_nnsupportfunctions.h"
+ 
++// Added by third_party/patches/0003-dual-core-depthwise-generic.patch.
++#include "third_party/cmsis_nn/Include/pico_nn_multicore.h"
++
+ /**
+  *  @ingroup Public
+  */
+@@ -66,14 +69,26 @@ depthwise_conv_s8_mult_4(const int8_t *input,
+                          const int32_t output_offset,
+                          const int32_t input_offset,
+                          const int32_t output_activation_min,
+-                         const int32_t output_activation_max)
++                         const int32_t output_activation_max,
++                         // Output row range, added so the loop can be split
++                         // across both cores. (out_h_start, out_h_end) ==
++                         // (0, output_y) reproduces the original behaviour.
++                         const int32_t out_h_start,
++                         const int32_t out_h_end)
+ {
+     const int32_t *bias_base = bias;
+     const int32_t *mult_base = output_mult;
+     const int32_t *shift_base = output_shift;
+     const int8_t *kernel_base = kernel;
+ 
+-    for (int32_t in_h = -pad_y, out_h = 0; out_h < output_y; in_h += stride_y, ++out_h)
++    (void)output_y;
++
++    // output is walked with *output++, so a row range starts part-way in. Each
++    // output row holds output_x * input_ch * ch_mult elements.
++    output += out_h_start * output_x * input_ch * ch_mult;
++
++    for (int32_t in_h = -pad_y + out_h_start * stride_y, out_h = out_h_start; out_h < out_h_end;
++         in_h += stride_y, ++out_h)
+     {
+         for (int32_t in_w = -pad_x, out_w = 0, ker_h_start = MAX(0, -in_h); out_w < output_x; in_w += stride_x, ++out_w)
+         {
+@@ -270,6 +285,67 @@ static void depthwise_conv_s8_generic(const int8_t *input,
+  *  Optimization using DSP extension is not available for the generic case where channel multiplier is > 1.
+  *
+  */
++// Added by third_party/patches/0003-dual-core-depthwise-generic.patch: carries
++// one depthwise_conv_s8_mult_4() call plus the output rows it should cover.
++typedef struct
++{
++    const int8_t *input;
++    int32_t input_x;
++    int32_t input_y;
++    int32_t input_ch;
++    const int8_t *kernel;
++    int32_t output_ch;
++    int32_t ch_mult;
++    int32_t kernel_x;
++    int32_t kernel_y;
++    int32_t pad_x;
++    int32_t pad_y;
++    int32_t stride_x;
++    int32_t stride_y;
++    const int32_t *bias;
++    int8_t *output;
++    const int32_t *output_shift;
++    const int32_t *output_mult;
++    int32_t output_x;
++    int32_t output_y;
++    int32_t output_offset;
++    int32_t input_offset;
++    int32_t output_activation_min;
++    int32_t output_activation_max;
++    int32_t out_h_start;
++    int32_t out_h_end;
++} PicoDwMult4Range;
++
++static void pico_dw_mult4_range(void *arg)
++{
++    const PicoDwMult4Range *r = (const PicoDwMult4Range *)arg;
++    depthwise_conv_s8_mult_4(r->input,
++                             r->input_x,
++                             r->input_y,
++                             r->input_ch,
++                             r->kernel,
++                             r->output_ch,
++                             r->ch_mult,
++                             r->kernel_x,
++                             r->kernel_y,
++                             r->pad_x,
++                             r->pad_y,
++                             r->stride_x,
++                             r->stride_y,
++                             r->bias,
++                             r->output,
++                             r->output_shift,
++                             r->output_mult,
++                             r->output_x,
++                             r->output_y,
++                             r->output_offset,
++                             r->input_offset,
++                             r->output_activation_min,
++                             r->output_activation_max,
++                             r->out_h_start,
++                             r->out_h_end);
++}
++
+ arm_cmsis_nn_status arm_depthwise_conv_s8(const cmsis_nn_context *ctx,
+                                           const cmsis_nn_dw_conv_params *dw_conv_params,
+                                           const cmsis_nn_per_channel_quant_params *quant_params,
+@@ -291,29 +367,49 @@ arm_cmsis_nn_status arm_depthwise_conv_s8(const cmsis_nn_context *ctx,
+     if (dw_conv_params->ch_mult % 4 == 0 && input_dims->n == 1 && dw_conv_params->dilation.w == 1 &&
+         dw_conv_params->dilation.h == 1)
+     {
+-        depthwise_conv_s8_mult_4(input,
+-                                 input_dims->w,
+-                                 input_dims->h,
+-                                 input_dims->c,
+-                                 kernel,
+-                                 output_dims->c,
+-                                 dw_conv_params->ch_mult,
+-                                 filter_dims->w,
+-                                 filter_dims->h,
+-                                 dw_conv_params->padding.w,
+-                                 dw_conv_params->padding.h,
+-                                 dw_conv_params->stride.w,
+-                                 dw_conv_params->stride.h,
+-                                 bias,
+-                                 output,
+-                                 quant_params->shift,
+-                                 quant_params->multiplier,
+-                                 output_dims->w,
+-                                 output_dims->h,
+-                                 dw_conv_params->output_offset,
+-                                 dw_conv_params->input_offset,
+-                                 dw_conv_params->activation.min,
+-                                 dw_conv_params->activation.max);
++        PicoDwMult4Range range;
++        range.input = input;
++        range.input_x = input_dims->w;
++        range.input_y = input_dims->h;
++        range.input_ch = input_dims->c;
++        range.kernel = kernel;
++        range.output_ch = output_dims->c;
++        range.ch_mult = dw_conv_params->ch_mult;
++        range.kernel_x = filter_dims->w;
++        range.kernel_y = filter_dims->h;
++        range.pad_x = dw_conv_params->padding.w;
++        range.pad_y = dw_conv_params->padding.h;
++        range.stride_x = dw_conv_params->stride.w;
++        range.stride_y = dw_conv_params->stride.h;
++        range.bias = bias;
++        range.output = output;
++        range.output_shift = quant_params->shift;
++        range.output_mult = quant_params->multiplier;
++        range.output_x = output_dims->w;
++        range.output_y = output_dims->h;
++        range.output_offset = dw_conv_params->output_offset;
++        range.input_offset = dw_conv_params->input_offset;
++        range.output_activation_min = dw_conv_params->activation.min;
++        range.output_activation_max = dw_conv_params->activation.max;
++        range.out_h_start = 0;
++        range.out_h_end = output_dims->h;
++
++#if PICO_NN_DUAL_CORE
++        // Split by output row; the halves write disjoint slices of output.
++        if (output_dims->h >= 4)
++        {
++            const int32_t split = output_dims->h / 2;
++            PicoDwMult4Range lo = range;
++            PicoDwMult4Range hi = range;
++            lo.out_h_end = split;
++            hi.out_h_start = split;
++            pico_nn_run_pair(pico_dw_mult4_range, &lo, &hi);
++        }
++        else
++#endif
++        {
++            pico_dw_mult4_range(&range);
++        }
+     }
+     else
+     {

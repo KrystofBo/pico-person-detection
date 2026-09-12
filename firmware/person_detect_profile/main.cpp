@@ -16,8 +16,18 @@
 #include "tensorflow/lite/micro/micro_profiler_interface.h"
 #include "tensorflow/lite/schema/schema_generated.h"
 
-constexpr int kTensorArenaSize = 136 * 1024;
+// 82,308 bytes are actually used; the rest of step 02's 136 KB is headroom we
+// need back when MODEL_IN_SRAM also wants ~294 KB of the 520 KB of SRAM.
+constexpr int kTensorArenaSize = 88 * 1024;
 alignas(16) static uint8_t tensor_arena[kTensorArenaSize];
+
+#if MODEL_IN_SRAM
+// Both cores stream weights over the same QSPI port through one shared 16 KB
+// XIP cache, so splitting a layer whose weights exceed the cache makes it
+// slower, not faster. Copying the model into SRAM removes flash from the inner
+// loop entirely. Sized for the known 300,568-byte model and checked at startup.
+alignas(16) static uint8_t model_sram[301 * 1024];
+#endif
 
 // TFLM's own MicroProfiler statically reserves ~80 KB for 4096 events. This model
 // has 31 operators, so a fixed 64 slots is enough and costs about 1 KB.
@@ -63,7 +73,19 @@ static OpProfiler profiler;
 int main() {
     stdio_init_all();
 
-    const tflite::Model* model = tflite::GetModel(g_person_detect_model_data);
+    const uint8_t* model_data = g_person_detect_model_data;
+#if MODEL_IN_SRAM
+    if ((size_t)g_person_detect_model_data_len > sizeof(model_sram)) {
+        while (true) {
+            printf("model_sram too small: need %d bytes\n", g_person_detect_model_data_len);
+            sleep_ms(2000);
+        }
+    }
+    memcpy(model_sram, g_person_detect_model_data, g_person_detect_model_data_len);
+    model_data = model_sram;
+#endif
+
+    const tflite::Model* model = tflite::GetModel(model_data);
 
     static tflite::MicroMutableOpResolver<5> resolver;
     resolver.AddAveragePool2D(tflite::Register_AVERAGE_POOL_2D_INT8());
@@ -86,9 +108,9 @@ int main() {
             continue;
         }
 
-        printf("--- clk_sys=%lu Hz, clk_peri=%lu Hz, arena used=%u bytes\n",
-               (unsigned long)clock_get_hz(clk_sys), (unsigned long)clock_get_hz(clk_peri),
-               (unsigned)interpreter.arena_used_bytes());
+        printf("--- clk_sys=%lu Hz, arena used=%u bytes, model in %s\n",
+               (unsigned long)clock_get_hz(clk_sys), (unsigned)interpreter.arena_used_bytes(),
+               model_data == g_person_detect_model_data ? "flash" : "SRAM");
 
         memcpy(input->data.int8, g_person_image_data, input->bytes);
 
