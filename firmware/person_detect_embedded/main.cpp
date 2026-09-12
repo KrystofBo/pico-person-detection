@@ -14,9 +14,16 @@
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/schema/schema_generated.h"
 
-// Same size as upstream's person_detection_test; the actual usage is printed.
-constexpr int kTensorArenaSize = 136 * 1024;
+// 82,308 bytes are actually used; the rest is headroom the SRAM copy below needs.
+constexpr int kTensorArenaSize = 88 * 1024;
 alignas(16) static uint8_t tensor_arena[kTensorArenaSize];
+
+// The CMSIS-NN kernels now split each conv across both cores, and both cores
+// stream weights over the same QSPI port through one shared 16 KB XIP cache.
+// Reading the model from flash makes the larger layers slower than single-core;
+// copying it into SRAM is what lets the split actually pay off. See the step 02
+// journal for the measurements.
+alignas(16) static uint8_t model_sram[301 * 1024];
 
 // Linker symbol marking the end of the program image in flash.
 extern "C" char __flash_binary_end;
@@ -24,7 +31,15 @@ extern "C" char __flash_binary_end;
 int main() {
     stdio_init_all();
 
-    const tflite::Model* model = tflite::GetModel(g_person_detect_model_data);
+    if ((size_t)g_person_detect_model_data_len > sizeof(model_sram)) {
+        while (true) {
+            printf("model_sram too small: need %d bytes\n", g_person_detect_model_data_len);
+            sleep_ms(2000);
+        }
+    }
+    memcpy(model_sram, g_person_detect_model_data, g_person_detect_model_data_len);
+
+    const tflite::Model* model = tflite::GetModel(model_sram);
 
     // Only the ops this model uses, with the CMSIS-NN optimized int8 kernels.
     static tflite::MicroMutableOpResolver<5> resolver;
