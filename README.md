@@ -25,4 +25,9 @@ Measured on the Pico 2 unless stated otherwise.
 
 | Model | Input | Accuracy | Latency | Flash (model) | Tensor arena |
 |-------|-------|----------|---------|---------------|--------------|
-| TFLM person detection (pretrained, pico-tflmicro) | 96×96 gray int8 | not measured yet (2/2 samples correct) | 190 ms | 300,568 B | 82,308 B |
+| TFLM person detection (pretrained, pico-tflmicro) | 96×96 gray int8 | not measured yet (2/2 samples correct) | **98.9 ms** | 300,568 B | 82,308 B |
+
+The model is 7.16 M MACs (MobileNet v1, α=0.25). Latency was 190.4 ms as first measured in step 02;
+[fix/02-inference-latency](docs/journal/02-tflm-embedded.md#fix-inference-latency--190-ms--99-ms) brought it to 98.9 ms
+(1.92×) by splitting the CMSIS-NN kernels across both cores and copying the model into SRAM, with bit-identical outputs.
+Total SRAM use is ~405 KB of 520 KB.
