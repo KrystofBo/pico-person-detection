@@ -91,6 +91,10 @@ Repeatable procedures (building, flashing, reading serial, ...) are project skil
 
 ## Workflow conventions
 - Work in numbered steps. One branch per step: `step/NN-short-name`.
+- Fixes never consume a step number. Branch `fix/NN-short-name`, where `NN` is the step whose
+  results the fix revises. The write-up is a new section appended to that step's existing
+  `docs/journal/NN-*.md`, not a new journal file, so each step's journal stays the single
+  narrative for its own numbers. Merge with `--no-ff`; no tag.
 - Small, focused commits: imperative subject, body explains *why*.
 - Each step adds `docs/journal/NN-title.md` (Goal, What we did, Commands, Results, Problems & fixes, Next) and updates the progress table in `README.md`.
 - End of step: summarize the diff for review, merge to `main` with `--no-ff`, tag `step-NN`. Never push unless asked.
