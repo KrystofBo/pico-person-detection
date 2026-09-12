@@ -76,7 +76,7 @@ First prove the pipeline with an existing model (TFLite Micro person detection),
 ## Hardware & environment
 - Board: Raspberry Pi Pico 2 (RP2350, Cortex-M33 @ 150 MHz, 520 KB SRAM, 4 MB flash), `PICO_BOARD=pico2`.
 - Host: WSL2 (Ubuntu). The Pico is attached to WSL with usbipd-win, so `picotool` and `/dev/ttyACM0` work from Linux.
-- Python tooling uses a Python 3.12 venv (system Python 3.14 lacks TF/LiteRT wheels).
+- Python tooling uses the conda env `pico-person-detection` (Python 3.12; system Python 3.14 lacks TF/LiteRT wheels), specified in `environment.yml`. Never install into a base/system interpreter - see the `python-env` skill.
 
 ## Layout (directories are created only when a step needs them)
 - `docs/journal/NN-title.md` - one write-up per step

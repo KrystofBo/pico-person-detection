@@ -1,0 +1,16 @@
+# Host-side Python environment for this project.
+#   conda env create -f environment.yml
+#   conda env update -f environment.yml --prune   # after editing this file
+# Python 3.12 because the system Python 3.14 has no TF/LiteRT wheels.
+name: pico-person-detection
+
+channels:
+  - defaults
+
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      # Reading .tflite models: the generated flatbuffers schema bindings.
+      - flatbuffers==25.12.19
+      - tflite==2.18.0
