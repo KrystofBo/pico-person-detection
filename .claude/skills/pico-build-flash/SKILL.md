@@ -16,6 +16,11 @@ cmake --build firmware/build -j8
 ```
 Each executable ends up at `firmware/build/<target>/<target>.uf2`. `PICO_BOARD` defaults to `pico2` in `firmware/CMakeLists.txt`.
 
+The configure step applies `third_party/patches/*.patch` to the pico-tflmicro submodule (dual-core CMSIS-NN kernels; see the step 02 journal). Consequences:
+- `git status` permanently shows `m third_party/pico-tflmicro`. That is expected - the submodule stays pinned to an upstream commit and must **not** be committed as a pointer change.
+- Re-configuring is safe; a patch that reverse-applies cleanly is skipped.
+- `git submodule update --force` or a submodule bump reverts/breaks the patches. Re-run the configure step to reapply; if it fails with "the patches need rebasing", regenerate them against the new commit.
+
 ## 2. Flash
 ```bash
 ~/opt/picotool/bin/picotool load -f -x firmware/build/<target>/<target>.uf2
