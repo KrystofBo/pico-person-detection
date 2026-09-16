@@ -2,7 +2,15 @@
 
 Person / no-person image classification running on a **Raspberry Pi Pico 2** (RP2350, 520 KB SRAM, 4 MB flash).
 
-There's no camera yet — images are currently embedded in the firmware, with host streaming over USB serial planned.
+> **The task is classification, not object detection.** The model answers one question per image — "is a
+> person present?" — as a 2-class softmax. It has no bounding boxes: a global average pool before the
+> classifier discards all spatial information by construction, so the network cannot represent *where*
+> anyone is. This is the [Visual Wake Words](https://arxiv.org/abs/1906.05721) task, which its own authors
+> frame as binary classification. The project name follows TensorFlow Lite Micro's `person_detection`
+> example, which we vendored; "detection" there means detecting *presence*.
+> Accordingly the metrics are accuracy / precision / recall, never mAP or IoU.
+
+There's no camera yet — images are either embedded in the firmware or streamed from the host over USB serial (step 03).
 The plan is to first run an existing model (TensorFlow Lite Micro person detection) to prove the pipeline end to end,
 then train our own model that fits the Pico's memory.
 

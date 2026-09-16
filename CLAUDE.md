@@ -70,6 +70,10 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## Goal
 A person / no-person image classifier that runs inference on a Raspberry Pi Pico 2.
+**Binary image classification** (person present / absent), not object detection - no bounding boxes,
+no localisation. Metrics are accuracy / precision / recall / F1, never mAP or IoU. If a dataset carries
+bounding boxes, they are collapsed to a presence label; Visual Wake Words counts a person only when the
+box covers >= 0.5% of the image area, and that threshold defines the task's difficulty.
 No camera yet: images are embedded in firmware or streamed from the host over USB serial.
 First prove the pipeline with an existing model (TFLite Micro person detection), then train our own smaller one.
 
