@@ -14,3 +14,10 @@ dependencies:
       # Reading .tflite models: the generated flatbuffers schema bindings.
       - flatbuffers==25.12.19
       - tflite==2.18.0
+      # Host-side reference inference (step 03). Note tools/host_reference.py
+      # pins BUILTIN_REF: the default XNNPACK delegate disagrees with the Pico.
+      - ai-edge-litert==2.2.0
+      # Image loading and preprocessing to 96x96 int8.
+      - pillow==12.3.0
+      # Talking to the Pico's USB CDC port.
+      - pyserial==3.5
