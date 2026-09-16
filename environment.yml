@@ -21,3 +21,6 @@ dependencies:
       - pillow==12.3.0
       # Talking to the Pico's USB CDC port.
       - pyserial==3.5
+      # Training and int8 conversion (step 04). The [and-cuda] extra pulls the
+      # NVIDIA wheels; drop it to train on CPU.
+      - tensorflow[and-cuda]==2.20.0
