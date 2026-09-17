@@ -266,6 +266,26 @@ values by the existing firmware. Measured on the first conversion: scale 0.00781
 anything falls outside the five the firmware registers. First conversion emitted exactly
 AVERAGE_POOL_2D, CONV_2D, DEPTHWISE_CONV_2D, RESHAPE, SOFTMAX.
 
+### Conversion to int8
+
+Run 2 converted successfully, which validates the deployment path end to end on a real model. Both
+guards passed: the op set came out as exactly the five registered ops, and input quantisation as scale
+1/128 zero point 0, so the `pixel - 128` bytes the host already sends are what this model expects.
+
+| | accuracy | precision | recall | F1 |
+|---|---|---|---|---|
+| baseline | **76.0%** | 79.7% | 69.8% | 74.5% |
+| run2 float | 72.2% | 74.3% | 68.0% | 71.0% |
+| run2 int8 | 72.0% | 74.1% | 67.6% | 70.7% |
+
+**Quantisation costs 0.2 points of accuracy.** Post-training quantisation is therefore good enough;
+quantisation-aware training is not worth pursuing for this model.
+
+Model size is 303,496 B against the baseline's 300,568 B - the same architecture, so no size win
+either. Nothing has been flashed: at 4.0 points below the baseline this model would make the device
+worse, and the deployment tooling (a .tflite to C array converter and a firmware target that embeds
+it) does not exist yet.
+
 ### Problems found while building it
 
 **Keras precision and recall were silently wrong.** `keras.metrics.Precision(class_id=1)` slices
