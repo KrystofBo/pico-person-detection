@@ -46,7 +46,7 @@ Measured on the Pico 2 unless stated otherwise.
 
 | Model | Input | Accuracy | Latency | Flash (model) | Tensor arena |
 |-------|-------|----------|---------|---------------|--------------|
-| TFLM person detection (pretrained, pico-tflmicro) | 96×96 gray int8 | not measured on a dataset (12/12 smoke samples correct) | **98.9 ms** | 300,568 B | 82,308 B |
+| TFLM person detection (pretrained, pico-tflmicro) | 96×96 gray int8 | 76.0% on Wake Vision test (n=9,000) | **98.9 ms** | 300,568 B | 82,308 B |
 
 The model is 7.16 M MACs (MobileNet v1, α=0.25). Latency was 190.4 ms as first measured in step 02;
 [fix/02-inference-latency](docs/journal/02-tflm-embedded.md#fix-inference-latency--190-ms--99-ms) brought it to 98.9 ms
@@ -54,5 +54,6 @@ The model is 7.16 M MACs (MobileNet v1, α=0.25). Latency was 190.4 ms as first 
 Total SRAM use is ~405 KB of 520 KB.
 
 Since step 03 the Pico's scores can be checked against a host reference running the same `.tflite`:
-they agree **exactly** on all 12 inputs tested (`results/step03-samples.csv`). The accuracy column stays
-unmeasured because 12 images is a smoke test, not a dataset — that needs the held-out set from step 04.
+they agree **exactly** on all 12 inputs tested (`results/step03-samples.csv`). Accuracy is measured on a
+balanced 9,000-image Wake Vision test split built in step 04; note the pretrained model was trained on
+Visual Wake Words, not Wake Vision, so 76.0% reflects that distribution mismatch.

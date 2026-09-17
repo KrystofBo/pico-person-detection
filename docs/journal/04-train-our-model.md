@@ -164,6 +164,68 @@ timed per-op on device. Neither exists yet.
 - Preprocessing: centre-crop beat squash and letterbox on the 10-image sample set (10/10 vs 9/10 vs
   7/10), but n=10 is not a result. Train and deploy with whichever is chosen, so the two match.
 
+## Dataset
+
+Wake Vision (`Harvard-Edge/Wake-Vision`), streamed and preprocessed by `tools/build_wake_vision.py`.
+The full dataset is 365 GB against ~39 GB free, so nothing is stored but the 96x96 mono result.
+
+| split | source | images | balance |
+|---|---|---|---|
+| train | `train_quality` | 40,000 | 20,000 / 20,000 |
+| val | official `validation` | 3,000 | 1,500 / 1,500 |
+| test | official `test` | 9,000 | 4,500 / 4,500 |
+
+Official validation and test splits are used as-is rather than carved from train, so results stay
+comparable to the published benchmark. 387 MB on disk, gitignored.
+
+Kept only images with aspect ratio within 25% of 1:1, then centre-cropped to square and resized to
+96x96 greyscale - the same preprocessing as inference, so train and deploy match.
+
+**Filtering to exactly 1:1 was not viable.** Measured yield on `train_quality` is 4.6%, which would
+need 2.17 M rows from a 1.20 M-row split. Separately, all 104 square images sampled across two splits
+were the same 447x447 size, so square images here are a systematically processed subset, not a
+representative slice. The 0.25 tolerance caps crop loss at 20% and admits the 4:3 and 3:2 aspects a
+camera actually produces.
+
+Build cost: 268,552 rows streamed for the 40,000 training images (14.9% yield) in 147 min. Yield falls
+towards the end of a run because the commoner class fills first and its rows are then discarded.
+
+### Integrity
+
+| check | result |
+|---|---|
+| counts and balance | exact, all three splits |
+| train vs val, train vs test | **0 shared images** |
+| val vs test | 1 shared image (0.01%) |
+| internal duplicates | 0 train, 0 val, 1 test |
+
+Verified by sha1 over raw pixels. Train is clean against both evaluation sets, so evaluation is
+unbiased.
+
+## Baseline measurement
+
+The bar to beat, measured with `tools/host_reference.py` (bit-exact against the device).
+
+| | accuracy | precision | recall | F1 |
+|---|---|---|---|---|
+| pretrained baseline, test (n=9,000) | **76.0%** | 79.7% | 69.8% | 74.5% |
+| pretrained baseline, validation (n=3,000) | 75.5% | 78.6% | 70.1% | 74.1% |
+| trivial mean-brightness threshold | 55.8% | - | - | - |
+
+Confusion on test: tp 3,143 · tn 3,700 · fp 800 · **fn 1,357**.
+
+Two observations:
+
+- **Recall is 10 points below precision.** The model misses 30% of people. Whatever we train should
+  close that gap; it is the more useful direction for a wake-word-style trigger.
+- **76% is a soft bar.** The pretrained model was trained on Visual Wake Words (COCO) and is being
+  evaluated on Wake Vision (Open Images), which uses a broader person definition - body parts count.
+  Beating it by training on the target distribution is expected rather than impressive. The
+  informative comparison will be against the published Wake Vision results, not against this number.
+
+The trivial floor of 55.8% is tuned on the training data itself, so it is optimistic; the ~11-level
+difference in mean brightness between classes is not an exploitable shortcut.
+
 ## Results
 
 Not yet run.
