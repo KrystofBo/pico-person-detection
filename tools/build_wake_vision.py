@@ -20,7 +20,8 @@ with --skip-rows using the row count printed on exit.
 from __future__ import annotations
 
 import argparse
-import itertools
+import os
+import sys
 import time
 from pathlib import Path
 
@@ -84,6 +85,17 @@ def main() -> None:
     try:
         for row in ds:
             rows += 1
+            # Must come before the filters below: gating it on accepted rows
+            # only ticks when one lands on the interval, about 18% of the time.
+            if rows % 5000 == 0:
+                done = kept[PERSON] + kept[NON_PERSON]
+                streamed = max(rows - args.skip_rows, 1)
+                elapsed = time.time() - start
+                eta = f"{(args.target - done) / (done / elapsed) / 60:.0f} min" if done else "?"
+                print(f"  rows {rows:,}  kept {done:,}/{args.target:,} "
+                      f"(person {kept[PERSON]:,} / non {kept[NON_PERSON]:,})  "
+                      f"yield {done / streamed:.1%}  eta {eta}", flush=True)
+
             label = row["person"]
             if label not in kept or kept[label] >= per_class:
                 continue                       # class already full, or unlabelled
@@ -102,14 +114,6 @@ def main() -> None:
                 shard += 1
             if kept[PERSON] >= per_class and kept[NON_PERSON] >= per_class:
                 break
-            if rows % 5000 == 0:
-                done = kept[PERSON] + kept[NON_PERSON]
-                rate = done / max(rows - args.skip_rows, 1)
-                elapsed = time.time() - start
-                eta = (args.target - done) / max(done / elapsed, 1e-9) / 60
-                print(f"  rows {rows:,}  kept {done:,}/{args.target:,} "
-                      f"(person {kept[PERSON]:,} / non {kept[NON_PERSON]:,})  "
-                      f"yield {rate:.1%}  eta {eta:.0f} min", flush=True)
     except KeyboardInterrupt:
         print("\ninterrupted")
     finally:
@@ -125,6 +129,13 @@ def main() -> None:
         print(f"  SHORT of target by {args.target - total:,} - the split ran out. "
               f"Resume is not possible past the end of a split.")
     print(f"  resume with --skip-rows {rows}")
+
+    # datasets/pyarrow background threads abort during interpreter finalisation
+    # ("PyGILState_Release: thread state must be current"), which dumps core and
+    # buries this summary. The data is already on disk, so leave without
+    # finalising. Flush first, since os._exit does not.
+    sys.stdout.flush()
+    os._exit(0)
 
 
 if __name__ == "__main__":
