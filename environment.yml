@@ -24,3 +24,8 @@ dependencies:
       # Training and int8 conversion (step 04). The [and-cuda] extra pulls the
       # NVIDIA wheels; drop it to train on CPU.
       - tensorflow[and-cuda]==2.20.0
+      # Streaming the Wake Vision dataset (tools/build_wake_vision.py).
+      - datasets==4.4.1
+      # TensorBoard 2.20 still imports pkg_resources, which setuptools removed
+      # in 81. Without this pin `tensorboard` dies on ModuleNotFoundError.
+      - setuptools<81
