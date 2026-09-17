@@ -232,3 +232,5 @@ datasets/
 # Built Wake Vision subset (~480 MB of .npy); rebuild with tools/build_wake_vision.py
 data/wake-vision-96/
 data/wake-vision-96-png/
+training/logs/
+training/runs/

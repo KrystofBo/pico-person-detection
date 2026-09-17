@@ -226,6 +226,71 @@ Two observations:
 The trivial floor of 55.8% is tuned on the training data itself, so it is optimistic; the ~11-level
 difference in mean brightness between classes is not an exploitable shortcut.
 
+## Training pipeline
+
+```
+training/model.py    MobileNet v1 builder, alpha and block list as parameters
+training/data.py     npz -> tf.data, scaling, augmentation, calibration samples
+training/train.py    training loop, metrics, TensorBoard
+training/convert.py  trained Keras -> int8 .tflite -> evaluation vs baseline
+training/logs/       TensorBoard runs (gitignored)
+training/runs/       checkpoints, exported .tflite, eval.json (gitignored)
+```
+
+```bash
+python training/train.py --name run0-noaug
+tensorboard --logdir training/logs
+python training/convert.py --run training/runs/run0-noaug-<stamp>
+```
+
+Architecture reproduces the baseline exactly: **conv weights 207,968 against the baseline's 207,968**,
+and 2,738 bias slots against 2,738. The Keras parameter count is higher (218,914) only because
+BatchNorm parameters exist before conversion folds them into the convs.
+
+### Monitoring
+
+TensorBoard per run under `training/logs/<name>-<timestamp>`, so runs overlay for comparison.
+Scalars: loss, accuracy, precision, recall, F1, learning rate. Histograms: weight distributions.
+Images: a grid of validation predictions each epoch, wrong ones outlined in red - the place where
+label noise from crop damage will show itself. Plus the model graph.
+
+### Two things that are checked rather than assumed
+
+**Input quantisation.** Training scales inputs to `(pixel - 128) / 128`, which makes post-training
+quantisation choose scale 1/128 and zero point 0 - so the int8 the device receives is exactly
+`pixel - 128`, the bytes `tools/model_io.py` already produces. `convert.py` asserts this and refuses
+to continue otherwise, because a model with different input quantisation would be silently fed wrong
+values by the existing firmware. Measured on the first conversion: scale 0.0078125, zero point 0.
+
+**Operator coverage.** `convert.py` runs the model through `tools/check_ops.py` and exits non-zero if
+anything falls outside the five the firmware registers. First conversion emitted exactly
+AVERAGE_POOL_2D, CONV_2D, DEPTHWISE_CONV_2D, RESHAPE, SOFTMAX.
+
+### Problems found while building it
+
+**Keras precision and recall were silently wrong.** `keras.metrics.Precision(class_id=1)` slices
+`y_true[..., 1]` as well as `y_pred`, but our labels are sparse with shape `(batch,)`, so it indexes
+the batch axis. On a hand-computed case whose true values are 0.667 / 0.667 it reported 1.000 / 0.500;
+without `class_id` it raises a shape error instead. `train.py` now defines `SparsePrecision` and
+`SparseRecall`, which take the class-1 probability and compare it against the sparse label. Verified
+against the hand-computed case. Recall is the metric we most want to improve, so a wrong one would
+have misdirected the whole step.
+
+**Training and export need different batch sizes.** Conversion requires `batch_size=1` or the
+converter emits SHAPE, STRIDED_SLICE and PACK; training with a fixed batch of 1 is useless. `model.py`
+therefore builds the architecture twice and copies weights across.
+
+**Paths were relative to the working directory**, so the scripts only ran from the repo root.
+`data.py` now anchors to `__file__`, matching `tools/model_io.py`.
+
+### Plan for the first runs
+
+Run 0 without augmentation, as the control: with 40,000 images and 218,914 parameters it should
+overfit, and the size of that gap is what says how much augmentation is worth. Augmentation
+(horizontal flip, brightness, contrast, +-8 px translation) is ablation 1. Defaults: batch 128, Adam
+with cosine decay from 1e-3, 60 epochs, early stopping on validation accuracy with patience 12.
+About 15 s per epoch on the GTX 1650.
+
 ## Results
 
 Not yet run.
