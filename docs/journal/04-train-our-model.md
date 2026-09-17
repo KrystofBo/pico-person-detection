@@ -317,4 +317,35 @@ Two things the numbers say about where to go next:
   close (77.2% vs 78.6%). The model is biased towards "no person" - the same failure the baseline has,
   slightly worse. Accuracy alone would hide this.
 
-Still 3.1 points short of the baseline on the same split.
+| run2-aug-long | yes | **74.6%** | 77.0% | 70.0% | 80.4% | 5.8 pts | epoch 83 (early, best 58) |
+
+Longer training is worth a further **+2.2 points**, and recall recovers from 63.6% to 70.0%, matching
+the baseline. But the lever is spent: validation peaked at epoch 58 and oscillated flat
+(0.733, 0.741, 0.737, 0.733, 0.736) until early stopping fired at 83. 150 epochs was not the binding
+constraint.
+
+### On test, which is the fair comparison
+
+Validation accuracy is optimistically biased for our runs because the checkpoint is *selected* on
+validation; the baseline had no such selection. Test is the honest number.
+
+| | accuracy | precision | recall | F1 | false negatives |
+|---|---|---|---|---|---|
+| baseline (pretrained) | **76.0%** | 79.7% | 69.8% | 74.5% | 1,357 |
+| run2-aug-long (float) | 72.2% | 74.3% | 68.0% | 71.0% | 1,442 |
+
+**We have not beaten the baseline: 3.8 points short on test.** Note our model drops 2.4 points from
+validation to test while the baseline gains 0.5, which is the checkpoint-selection bias showing.
+
+Levers tried and their value: augmentation +8.6, longer schedule +2.2, both on validation. Untried:
+initialising from the pretrained weights instead of from scratch, and more data. The plateau at
+epoch 58 says the recipe is no longer the constraint.
+
+### Problems found
+
+**Checkpoints could not be reloaded.** `SparsePrecision` and `SparseRecall` are not registered for
+Keras serialisation, so `load_model` raised `TypeError: Could not locate class 'SparsePrecision'` -
+which meant every run was unconvertible and the whole deployment path was blocked. `convert.py` now
+loads with `compile=False`, since conversion and evaluation need only architecture and weights. It
+surfaced from evaluating a checkpoint by hand; going straight to conversion would have hit the same
+wall.
