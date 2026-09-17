@@ -293,4 +293,28 @@ About 15 s per epoch on the GTX 1650.
 
 ## Results
 
-Not yet run.
+All figures are validation (n=3,000), so they compare like-for-like with the baseline measured on the
+same split (75.5%). Test numbers come from `convert.py` and are recorded when a model is worth
+deploying.
+
+| run | augment | best val acc | val precision | val recall | train acc at end | gap | stopped |
+|---|---|---|---|---|---|---|---|
+| baseline (pretrained) | - | 75.5% | 78.6% | 70.1% | - | - | - |
+| run0-noaug | no | 63.8% | - | - | 84.7% | **23 pts** | epoch 26 (early) |
+| run1-aug | yes | **72.4%** | 77.2% | 63.6% | 78.6% | **6 pts** | epoch 60 (ran out) |
+
+**Augmentation is worth +8.6 points** and closes the train/val gap from 23 to 6. Run 0 confirmed the
+failure mode was memorisation of 40,000 images, not a broken pipeline, which is what the control was
+for.
+
+Two things the numbers say about where to go next:
+
+- **Run 1 never converged.** Its best epoch was 56 of 60 and validation accuracy was still climbing
+  when the schedule ran out. Some of that late gain is the cosine decay annealing to zero, but the
+  trajectory (0.668 at 21, 0.708 at 31, 0.717 at 51, 0.724 at 56) does not look finished. A longer
+  schedule is the cheapest untried lever.
+- **Recall is the weak axis, and worse than the baseline's.** 63.6% against 70.1%, while precision is
+  close (77.2% vs 78.6%). The model is biased towards "no person" - the same failure the baseline has,
+  slightly worse. Accuracy alone would hide this.
+
+Still 3.1 points short of the baseline on the same split.
