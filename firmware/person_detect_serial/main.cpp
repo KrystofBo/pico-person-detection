@@ -32,17 +32,16 @@
 
 // v1 uses 82,308 bytes of arena; v3-Small measured 79,428 but needs a much
 // larger model buffer. The firmware prints what was actually used.
-constexpr int kTensorArenaSize = (EXTENDED_OPS ? 100 : 88) * 1024;
+constexpr int kTensorArenaSize = (EXTENDED_OPS ? 184 : 88) * 1024;
 alignas(16) static uint8_t tensor_arena[kTensorArenaSize];
 
 // The CMSIS-NN kernels split each conv across both cores; reading weights from
 // flash makes them contend for the shared XIP cache. See the step 02 journal.
 // v1 is 303,496 bytes; v3-Small is 341,312, because its 110 operators carry far
 // more flatbuffer overhead than v1's 31 despite having fewer parameters.
-alignas(16) static uint8_t model_sram[(EXTENDED_OPS ? 336 : 301) * 1024];
+alignas(16) static uint8_t model_sram[(EXTENDED_OPS ? 282 : 301) * 1024];
 
 constexpr int kInputBytes = kNumCols * kNumRows * kNumChannels;
-static int8_t frame[kInputBytes];
 
 // No timeout while waiting for a new frame to start, but once a frame is in
 // flight a stall means the host died mid-send and we should resynchronise.
@@ -115,12 +114,15 @@ int main() {
     while (true) {
         wait_for_magic();
 
-        if (!read_exact(frame, kInputBytes)) {
+        // Read straight into the input tensor rather than through a staging
+        // buffer: that buffer cost 9,216 bytes of SRAM, which matters when a
+        // model and its arena are competing for 520 KB. A truncated frame
+        // leaves the tensor half-written, which is harmless because we report
+        // the error and the host resends before anything reads it.
+        if (!read_exact(input->data.int8, kInputBytes)) {
             printf("ERR short_frame\n");
             continue;
         }
-
-        memcpy(input->data.int8, frame, kInputBytes);
 
         uint64_t start = time_us_64();
         TfLiteStatus status = interpreter.Invoke();

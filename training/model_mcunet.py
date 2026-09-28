@@ -20,9 +20,19 @@ What makes it promising here, unlike v3: relu6 throughout and no squeeze-excite,
 so the only operator beyond the base five is ADD for the residuals - measured at
 2% of inference time, against h-swish's 36%.
 
-alpha defaults to 0.7, where the network has 208,922 weights against MobileNet
-v1's 207,968 - a capacity match to within 0.5%, so the comparison isolates
-architecture. At the published width it is 600 KB of int8 and does not fit.
+alpha defaults to 0.5. Not for capacity parity - 0.7 matched v1 to 0.5% - but
+because alpha cannot buy what actually constrains this model.
+
+Peak activation memory is 221,184 bytes at every alpha from 0.4 to 0.7, flat,
+because the largest tensor is block 1's expansion: the stem width floors at 8
+channels and block 1 expands it 6x at 48x48, and neither term scales with alpha.
+Measured arena on device is 180,916 bytes against MobileNet v1's 82,308. So alpha
+only shrinks the weights, and it has to shrink them enough that weights plus a
+fixed ~181 KB arena fit in 520 KB of SRAM.
+
+At 0.6 that leaves 36 KB for stacks and the board hard-faulted. 0.5 leaves about
+90 KB. The cost is capacity: 121,234 weights against v1's 207,968, so this is no
+longer a like-for-like comparison.
 """
 from __future__ import annotations
 
@@ -89,11 +99,11 @@ def _build(alpha: float, batch_size: int | None) -> keras.Model:
     return keras.Model(inp, out, name=f"mcunet_vww_a{alpha:g}")
 
 
-def build(alpha: float = 0.7) -> keras.Model:
+def build(alpha: float = 0.5) -> keras.Model:
     return _build(alpha, batch_size=None)
 
 
-def build_for_export(alpha: float = 0.7, weights_from: keras.Model | None = None):
+def build_for_export(alpha: float = 0.5, weights_from: keras.Model | None = None):
     model = _build(alpha, batch_size=1)
     if weights_from is not None:
         model.set_weights(weights_from.get_weights())

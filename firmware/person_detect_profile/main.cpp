@@ -26,7 +26,7 @@
 
 // v1 uses 82,308 bytes of arena; v3-Small measured 79,428 but needs a much
 // larger model buffer. The firmware prints what was actually used.
-constexpr int kTensorArenaSize = (EXTENDED_OPS ? 100 : 88) * 1024;
+constexpr int kTensorArenaSize = (EXTENDED_OPS ? 184 : 88) * 1024;
 alignas(16) static uint8_t tensor_arena[kTensorArenaSize];
 
 #if MODEL_IN_SRAM
@@ -36,7 +36,7 @@ alignas(16) static uint8_t tensor_arena[kTensorArenaSize];
 // loop entirely. v1 is 303,496 bytes; v3-Small is 341,312, because its 110
 // operators carry far more flatbuffer overhead than v1's 31 despite having
 // fewer parameters. Checked against the real length at startup.
-alignas(16) static uint8_t model_sram[(EXTENDED_OPS ? 336 : 301) * 1024];
+alignas(16) static uint8_t model_sram[(EXTENDED_OPS ? 282 : 301) * 1024];
 #endif
 
 // TFLM's own MicroProfiler statically reserves ~80 KB for 4096 events. MobileNet
