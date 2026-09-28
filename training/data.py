@@ -13,6 +13,7 @@ trusting it.
 """
 from __future__ import annotations
 
+import functools
 import glob
 from pathlib import Path
 
@@ -27,8 +28,14 @@ REPO = Path(__file__).resolve().parent.parent
 DATA_ROOT = REPO / "data/wake-vision-96"
 
 
+@functools.lru_cache(maxsize=None)
 def load_split(split: str, root: Path | None = None) -> tuple[np.ndarray, np.ndarray]:
-    """-> (uint8 images (N,96,96), uint8 labels (N,)). 1 = person."""
+    """-> (uint8 images (N,96,96), uint8 labels (N,)). 1 = person.
+
+    Cached: train.py asks for the training split more than once, and at 80,000
+    images each uncached call decompresses 40 shards again. Callers must not
+    modify the returned arrays.
+    """
     root = root or DATA_ROOT
     name = SPLITS.get(split, split)
     shards = sorted(glob.glob(str(root / f"{name}_*.npz")))
@@ -44,6 +51,11 @@ def load_split(split: str, root: Path | None = None) -> tuple[np.ndarray, np.nda
 def scale(images: np.ndarray) -> np.ndarray:
     """uint8 pixels -> float32 in [-1, 1), matching the device's int8 mapping."""
     return (images.astype(np.float32) - 128.0) / 128.0
+
+
+def _scale_batch(x, y):
+    """The tf.data equivalent of scale(): identical arithmetic, done per batch."""
+    return (tf.cast(x, tf.float32) - 128.0) / 128.0, y
 
 
 def _augment(x, y):
@@ -64,10 +76,17 @@ def dataset(split: str, batch_size: int, *, augment: bool = False,
     if shuffle is None:
         shuffle = split == "train"
 
-    ds = tf.data.Dataset.from_tensor_slices((scale(images)[..., None], labels.astype(np.int32)))
+    # Keep the source as uint8 on the CPU and scale per batch. Scaling all 80,000
+    # images up front made a 2.95 GB float32 tensor, which TensorFlow placed on
+    # the GPU as a constant - the GTX 1650 gives it ~2.2 GB - and training failed
+    # before the first step with "Dst tensor is not initialized". As uint8 on
+    # the host it is 0.74 GB, and the shuffle buffer shrinks by the same factor.
+    with tf.device("/CPU:0"):
+        ds = tf.data.Dataset.from_tensor_slices((images[..., None], labels.astype(np.int32)))
     if shuffle:
         ds = ds.shuffle(len(labels), reshuffle_each_iteration=True)
     ds = ds.batch(batch_size)
+    ds = ds.map(_scale_batch, num_parallel_calls=AUTOTUNE)
     if augment:
         ds = ds.map(_augment, num_parallel_calls=AUTOTUNE)
     return ds.prefetch(AUTOTUNE)
