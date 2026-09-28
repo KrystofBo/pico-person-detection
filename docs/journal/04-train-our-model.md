@@ -405,8 +405,47 @@ which together with the model would fit in SRAM. Building at 96 for comparabilit
 budget the architecture was designed around. The lesson is not that MCUNet is too big; it is that
 MCUNet's resolution is not a free parameter.
 
-Untried follow-up: a narrower MCUNet, or one built at resolution 80. Both would change the input
-pipeline or the capacity match, so neither is a like-for-like comparison with the runs above.
+#### Narrowing it to fit (run 5)
+
+alpha cannot buy arena. Peak activation memory is 221,184 bytes at every alpha from 0.4 to 0.7,
+because the largest tensor is block 1's expansion: the stem width floors at 8 channels and block 1
+expands it 6x at 48x48, and neither term scales with alpha. alpha only shrinks the weights, which then
+had to fit alongside a fixed ~180 KB arena. Two SRAM savings made alpha=0.6 comfortable: reading USB
+frames straight into the input tensor instead of a 9,216-byte staging buffer, and sizing the model
+buffer to the model rather than rounding up.
+
+| | test acc | precision | recall | F1 | model | arena | device ms |
+|---|---|---|---|---|---|---|---|
+| baseline (pretrained) | **76.0%** | 79.7% | **69.8%** | 74.5% | 300,568 | 82,308 | **99.1** |
+| v1 ours, run 2 | 72.0% | 74.1% | 67.6% | 70.7% | 303,496 | 82,308 | 108.7 |
+| v3-Small, run 3 | 70.2% | 73.6% | 63.2% | 68.0% | 341,312 | 79,428 | 112.3 |
+| MCUNet a=0.7, run 4 | 74.9% | 77.9% | 69.5% | 73.5% | 356,288 | 180,916 | 251 (flash) |
+| MCUNet a=0.6, run 5 | 74.1% | 78.4% | 66.5% | 71.9% | 301,960 | 177,284 | 199.5 |
+
+Narrowing cost 0.8 points of accuracy and 3.0 of recall for 20% fewer weights. Device and host agree
+bit-exactly on all 10 sample images.
+
+**MCUNet is the best architecture we trained and still loses to the pretrained baseline on both
+axes**: 74.1% against 76.0%, and 199.5 ms against 99.1.
+
+The profile says why it is slow. Depthwise convolution is 104.0 ms of the 199.5 - **52%** - across 16
+operators. MCUNet's searched kernels are 5x5 and 7x7 as well as 3x3, and depthwise costs 35.3 ns/MAC
+here against pointwise's 10.4. Residual `ADD` adds 17.5 ms, 9%. So MCUNet has roughly six times fewer
+MACs than MobileNet v1 and runs twice as slow, because its MACs sit in the operator this chip handles
+worst. **Total MACs is the wrong quantity to design against here; the operator mix is.**
+
+#### Learned the hard way
+
+Flashing an **untrained** model hard-faults the board, twice costing a BOOTSEL recovery. Not a memory
+problem: raising the margin from 36,732 to 46,972 bytes changed nothing. Random weights leave channels
+with a near-zero range, giving 2,562 quantisation scales below 1e-9 and a smallest of 1.68e-12; the
+requantisation shift derived from those goes out of range, and shifting by 32 or more bits is
+undefined behaviour, so the firmware dies before it can print and USB never enumerates.
+`tools/check_scales.py` now refuses such a model. Trained models sit around 6e-8.
+
+Untried: MCUNet at its searched resolution of 80, and stripping the 67,584 bytes of `zero_point`
+vectors from the flatbuffer - 8 bytes per channel, zero for 8,391 of 8,448 entries. That would be
+enough to fit alpha=0.7, but with alpha=0.6 only 0.8 points behind, it would buy little.
 
 ### Problems found while building it
 
