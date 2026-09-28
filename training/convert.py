@@ -26,6 +26,7 @@ from tensorflow import keras
 
 import data as D
 import model as M
+import model_v3 as M3
 
 import sys
 sys.path.insert(0, str(D.REPO / "tools"))
@@ -69,12 +70,13 @@ def main() -> None:
 
     config = json.loads((args.run / "config.json").read_text())
     alpha = args.alpha if args.alpha is not None else config["alpha"]
+    arch = config.get("arch", "v1")
 
     # compile=False: the checkpoint references SparsePrecision/SparseRecall, which are
     # not registered for serialisation, and loading them would fail. Conversion and
     # evaluation need only the architecture and weights.
     trained = keras.models.load_model(args.run / "best.keras", compile=False)
-    export = M.build_for_export(alpha=alpha, weights_from=trained)
+    export = (M if arch == "v1" else M3).build_for_export(alpha=alpha, weights_from=trained)
 
     converter = tf.lite.TFLiteConverter.from_keras_model(export)
     converter.optimizations = [tf.lite.Optimize.DEFAULT]

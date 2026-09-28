@@ -9,8 +9,13 @@ from pathlib import Path
 
 import tflite
 
-# Registered in firmware/*/main.cpp via MicroMutableOpResolver<5>.
-PICO_OPS = {"AVERAGE_POOL_2D", "CONV_2D", "DEPTHWISE_CONV_2D", "RESHAPE", "SOFTMAX"}
+# Registered in firmware/*/main.cpp via MicroMutableOpResolver<8>. Keep in step
+# with those files: this is what decides whether a model can run on the device.
+PICO_OPS = {
+    "AVERAGE_POOL_2D", "CONV_2D", "DEPTHWISE_CONV_2D", "RESHAPE", "SOFTMAX",
+    # Added for MobileNetV3: residuals, squeeze-excite rescale, h-swish.
+    "ADD", "MUL", "HARD_SWISH",
+}
 
 
 def model_ops(blob: bytes) -> list[str]:

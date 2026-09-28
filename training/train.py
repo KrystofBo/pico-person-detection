@@ -26,6 +26,7 @@ from tensorflow import keras
 
 import data as D
 import model as M
+import model_v3 as M3
 
 BASELINE_TEST_ACCURACY = 0.760
 
@@ -84,7 +85,9 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--name", required=True, help="run name; used for the log and run directory")
-    ap.add_argument("--alpha", type=float, default=0.25)
+    ap.add_argument("--arch", choices=["v1", "v3"], default="v1")
+    ap.add_argument("--alpha", type=float, default=None,
+                    help="default: 0.25 for v1, 0.35 for v3")
     ap.add_argument("--epochs", type=int, default=60)
     ap.add_argument("--batch-size", type=int, default=128)
     ap.add_argument("--lr", type=float, default=1e-3)
@@ -101,7 +104,8 @@ def main() -> None:
     val_ds = D.dataset("val", args.batch_size)
     val_images, val_labels = D.load_split("val")
 
-    model = M.build(alpha=args.alpha)
+    alpha = args.alpha if args.alpha is not None else (0.25 if args.arch == "v1" else 0.35)
+    model = (M if args.arch == "v1" else M3).build(alpha=alpha)
     steps = args.epochs * (len(D.load_split("train")[1]) // args.batch_size)
     schedule = keras.optimizers.schedules.CosineDecay(args.lr, decay_steps=steps)
     model.compile(
@@ -132,7 +136,7 @@ def main() -> None:
     best = max(history.history["val_accuracy"])
     model.save(run_dir / "final.keras")
     (run_dir / "config.json").write_text(json.dumps({
-        "name": args.name, "alpha": args.alpha, "epochs": args.epochs,
+        "name": args.name, "arch": args.arch, "alpha": alpha, "epochs": args.epochs,
         "batch_size": args.batch_size, "lr": args.lr, "augment": args.augment,
         "best_val_accuracy": best, "log_dir": str(log_dir),
     }, indent=2))

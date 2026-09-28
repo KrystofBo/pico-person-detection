@@ -22,12 +22,12 @@
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/schema/schema_generated.h"
 
-constexpr int kTensorArenaSize = 88 * 1024;
+constexpr int kTensorArenaSize = 120 * 1024;
 alignas(16) static uint8_t tensor_arena[kTensorArenaSize];
 
 // The CMSIS-NN kernels split each conv across both cores; reading weights from
 // flash makes them contend for the shared XIP cache. See the step 02 journal.
-alignas(16) static uint8_t model_sram[301 * 1024];
+alignas(16) static uint8_t model_sram[320 * 1024];
 
 constexpr int kInputBytes = kNumCols * kNumRows * kNumChannels;
 static int8_t frame[kInputBytes];
@@ -67,12 +67,18 @@ int main() {
     memcpy(model_sram, g_person_detect_model_data, g_person_detect_model_data_len);
     const tflite::Model* model = tflite::GetModel(model_sram);
 
-    static tflite::MicroMutableOpResolver<5> resolver;
+    static tflite::MicroMutableOpResolver<8> resolver;
     resolver.AddAveragePool2D(tflite::Register_AVERAGE_POOL_2D_INT8());
     resolver.AddConv2D(tflite::Register_CONV_2D_INT8());
     resolver.AddDepthwiseConv2D(tflite::Register_DEPTHWISE_CONV_2D_INT8());
     resolver.AddReshape();
     resolver.AddSoftmax(tflite::Register_SOFTMAX_INT8());
+    // MobileNetV3 needs three more: residual connections (ADD), the
+    // squeeze-excite rescale (MUL) and h-swish. MobileNet v1 models do not use
+    // them, so this only costs a little flash for those.
+    resolver.AddAdd();
+    resolver.AddMul();
+    resolver.AddHardSwish();
 
     static tflite::MicroInterpreter interpreter(model, resolver, tensor_arena, kTensorArenaSize);
     if (interpreter.AllocateTensors() != kTfLiteOk) {

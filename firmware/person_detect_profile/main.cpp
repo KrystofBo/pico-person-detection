@@ -16,21 +16,24 @@
 #include "tensorflow/lite/micro/micro_profiler_interface.h"
 #include "tensorflow/lite/schema/schema_generated.h"
 
-// 82,308 bytes are actually used; the rest of step 02's 136 KB is headroom we
-// need back when MODEL_IN_SRAM also wants ~294 KB of the 520 KB of SRAM.
-constexpr int kTensorArenaSize = 88 * 1024;
+// MobileNet v1 uses 82,308 bytes. MobileNetV3-Small needs more, and its
+// requirement is not predictable from the host, so this is generous; the
+// firmware prints what was actually used.
+constexpr int kTensorArenaSize = 120 * 1024;
 alignas(16) static uint8_t tensor_arena[kTensorArenaSize];
 
 #if MODEL_IN_SRAM
 // Both cores stream weights over the same QSPI port through one shared 16 KB
 // XIP cache, so splitting a layer whose weights exceed the cache makes it
 // slower, not faster. Copying the model into SRAM removes flash from the inner
-// loop entirely. Sized for the known 300,568-byte model and checked at startup.
-alignas(16) static uint8_t model_sram[301 * 1024];
+// loop entirely. Sized for MobileNetV3-Small's 316,696 bytes; checked at startup.
+alignas(16) static uint8_t model_sram[320 * 1024];
 #endif
 
-// TFLM's own MicroProfiler statically reserves ~80 KB for 4096 events. This model
-// has 31 operators, so a fixed 64 slots is enough and costs about 1 KB.
+// TFLM's own MicroProfiler statically reserves ~80 KB for 4096 events. MobileNet
+// v1 has 31 operators; MobileNetV3-Small has well over a hundred once its
+// squeeze-excite blocks and h-swish activations are counted, so 192 slots. That
+// costs about 2.3 KB against MicroProfiler's 80 KB.
 class OpProfiler : public tflite::MicroProfilerInterface {
   public:
     uint32_t BeginEvent(const char* tag) override {
@@ -61,7 +64,7 @@ class OpProfiler : public tflite::MicroProfilerInterface {
     }
 
   private:
-    static constexpr uint32_t kMaxEvents = 64;
+    static constexpr uint32_t kMaxEvents = 192;
     const char* tags_[kMaxEvents];
     uint32_t start_us_[kMaxEvents];
     uint32_t elapsed_us_[kMaxEvents];
@@ -87,12 +90,18 @@ int main() {
 
     const tflite::Model* model = tflite::GetModel(model_data);
 
-    static tflite::MicroMutableOpResolver<5> resolver;
+    static tflite::MicroMutableOpResolver<8> resolver;
     resolver.AddAveragePool2D(tflite::Register_AVERAGE_POOL_2D_INT8());
     resolver.AddConv2D(tflite::Register_CONV_2D_INT8());
     resolver.AddDepthwiseConv2D(tflite::Register_DEPTHWISE_CONV_2D_INT8());
     resolver.AddReshape();
     resolver.AddSoftmax(tflite::Register_SOFTMAX_INT8());
+    // MobileNetV3 needs three more: residual connections (ADD), the
+    // squeeze-excite rescale (MUL) and h-swish. MobileNet v1 models do not use
+    // them, so this only costs a little flash for those.
+    resolver.AddAdd();
+    resolver.AddMul();
+    resolver.AddHardSwish();
 
     static tflite::MicroInterpreter interpreter(model, resolver, tensor_arena,
                                                 kTensorArenaSize, nullptr, &profiler);
