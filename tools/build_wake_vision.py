@@ -20,15 +20,19 @@ with --skip-rows using the row count printed on exit.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 import time
+import urllib.request
 from pathlib import Path
 
 import numpy as np
 from datasets import load_dataset
+from huggingface_hub import HfApi
 from PIL import Image
 
+REPO = "Harvard-Edge/Wake-Vision"
 SIZE = 96
 SHARD = 2000
 PERSON, NON_PERSON = 1, 0
@@ -62,7 +66,13 @@ def main() -> None:
     ap.add_argument("--tolerance", type=float, default=0.25,
                     help="max |aspect - 1| to accept (default 0.25)")
     ap.add_argument("--skip-rows", type=int, default=0,
-                    help="resume: skip this many source rows first")
+                    help="resume by streaming past this many rows; costs as much time as "
+                         "reading them, so prefer --start-file")
+    ap.add_argument("--start-file", type=int, default=0,
+                    help="resume by reading from this parquet file onward. The splits are "
+                         "sharded into many small files (train_quality has 690 at ~1,733 rows "
+                         "each), so this skips at no cost, unlike --skip-rows. A run that "
+                         "streamed N rows consumed about N/1733 files.")
     args = ap.parse_args()
 
     if args.target % 2:
@@ -78,12 +88,55 @@ def main() -> None:
     rejected_aspect = 0
     start = time.time()
 
-    ds = load_dataset("Harvard-Edge/Wake-Vision", split=args.split, streaming=True)
+    if args.start_file:
+        # Read the split's parquet shards directly, starting part way in.
+        # hf:// paths go through huggingface_hub, so the stored token is used;
+        # the dataset-viewer API URLs are not loadable this way.
+        api = HfApi()
+        files = sorted(f for f in api.list_repo_files(REPO, repo_type="dataset")
+                       if f.endswith(".parquet") and args.split in f)
+        if args.start_file >= len(files):
+            raise SystemExit(f"--start-file {args.start_file}, but {args.split} has {len(files)} shards")
+        chosen = [f"hf://datasets/{REPO}/{f}" for f in files[args.start_file:]]
+        print(f"reading {len(chosen)} of {args.split}'s {len(files)} shards, "
+              f"from index {args.start_file}", flush=True)
+        ds = load_dataset("parquet", data_files={"train": chosen}, split="train", streaming=True)
+    else:
+        ds = load_dataset(REPO, split=args.split, streaming=True)
     if args.skip_rows:
         ds = ds.skip(args.skip_rows)
 
+    # HuggingFace rate-limits anonymous IPs, and a multi-hour read will hit it.
+    # A 429 mid-stream would otherwise throw away the whole run, so retry with
+    # backoff and carry on from where the iterator stopped.
+    def rows_with_retry(iterable):
+        it = iter(iterable)
+        stalls = 0
+        while True:
+            try:
+                yield next(it)
+                stalls = 0
+            except StopIteration:
+                return
+            except Exception as exc:
+                if "429" not in str(exc) and "rate limit" not in str(exc).lower():
+                    raise
+                stalls += 1
+                if stalls > 6:
+                    print(f"  giving up after {stalls} rate-limit stalls; "
+                          f"resume with --start-file", flush=True)
+                    return
+                wait = 60 * stalls
+                print(f"  rate limited, waiting {wait}s (stall {stalls}/6)", flush=True)
+                time.sleep(wait)
+                # Deliberately not re-creating the iterator: iter() on a
+                # streaming dataset restarts from the beginning, which would
+                # duplicate everything already collected. If the iterator did
+                # not survive, the next attempt raises again and we stop and
+                # report a resume point instead.
+
     try:
-        for row in ds:
+        for row in rows_with_retry(ds):
             rows += 1
             # Must come before the filters below: gating it on accepted rows
             # only ticks when one lands on the interval, about 18% of the time.
