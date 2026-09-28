@@ -22,12 +22,12 @@
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/schema/schema_generated.h"
 
-constexpr int kTensorArenaSize = 120 * 1024;
+constexpr int kTensorArenaSize = 100 * 1024;
 alignas(16) static uint8_t tensor_arena[kTensorArenaSize];
 
 // The CMSIS-NN kernels split each conv across both cores; reading weights from
 // flash makes them contend for the shared XIP cache. See the step 02 journal.
-alignas(16) static uint8_t model_sram[320 * 1024];
+alignas(16) static uint8_t model_sram[336 * 1024];
 
 constexpr int kInputBytes = kNumCols * kNumRows * kNumChannels;
 static int8_t frame[kInputBytes];

@@ -19,15 +19,17 @@
 // MobileNet v1 uses 82,308 bytes. MobileNetV3-Small needs more, and its
 // requirement is not predictable from the host, so this is generous; the
 // firmware prints what was actually used.
-constexpr int kTensorArenaSize = 120 * 1024;
+constexpr int kTensorArenaSize = 100 * 1024;
 alignas(16) static uint8_t tensor_arena[kTensorArenaSize];
 
 #if MODEL_IN_SRAM
 // Both cores stream weights over the same QSPI port through one shared 16 KB
 // XIP cache, so splitting a layer whose weights exceed the cache makes it
 // slower, not faster. Copying the model into SRAM removes flash from the inner
-// loop entirely. Sized for MobileNetV3-Small's 316,696 bytes; checked at startup.
-alignas(16) static uint8_t model_sram[320 * 1024];
+// loop entirely. Sized for MobileNetV3-Small's 341,312 bytes; checked at startup.
+// v3's 110 operators carry far more flatbuffer overhead than v1's 31, so it is
+// the larger file despite having fewer parameters.
+alignas(16) static uint8_t model_sram[336 * 1024];
 #endif
 
 // TFLM's own MicroProfiler statically reserves ~80 KB for 4096 events. MobileNet
