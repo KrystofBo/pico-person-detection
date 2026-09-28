@@ -36,6 +36,8 @@ if(EXISTS ${CUSTOM_MODEL})
     )
     target_include_directories(person_detect_profile_custom PRIVATE ${TFLM_EXAMPLE} ${TFLM_PERSON_MODEL})
     target_compile_definitions(person_detect_profile_custom PRIVATE MODEL_IN_SRAM=1)
+    # Either architecture may be generated here, so register the full op set.
+    target_compile_definitions(person_detect_profile_custom PRIVATE EXTENDED_OPS=1)
     target_link_libraries(person_detect_profile_custom pico_stdlib pico-tflmicro)
     pico_enable_stdio_usb(person_detect_profile_custom 1)
     pico_enable_stdio_uart(person_detect_profile_custom 0)
