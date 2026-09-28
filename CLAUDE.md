@@ -104,7 +104,10 @@ Repeatable procedures (building, flashing, reading serial, ...) are project skil
   update the affected docs directly. Merge with `--no-ff`.
 - Work that might not land - an alternative architecture, a different approach - goes on
   `experiment/short-name`, branched from the step it belongs to rather than from `main`, since it
-  builds on that step. No number, no tag. Merge into the parent step branch only if it wins.
+  builds on that step. No number, no tag. Merge into the parent step branch only if it wins, **or if
+  keeping it demonstrably costs the main path nothing** - demonstrably meaning measured, not argued:
+  MobileNetV3 was kept because the default firmware came out byte-identical with it present, and
+  because it stays swappable behind one flag.
   **The result goes into that step's journal either way**: a negative result is still a result, and
   throwing it away means someone repeats the work later.
 - Small, focused commits: imperative subject, body explains *why*.
