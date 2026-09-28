@@ -234,3 +234,6 @@ data/wake-vision-96/
 data/wake-vision-96-png/
 training/logs/
 training/runs/
+
+# Generated C array of a trained model; regenerate with tools/tflite_to_c.py
+firmware/generated/

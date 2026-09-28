@@ -52,12 +52,15 @@ def main() -> None:
     ap.add_argument("--samples", action="store_true",
                     help="also send the two embedded int8 arrays (known ground truth)")
     ap.add_argument("--port", default="/dev/ttyACM0")
+    ap.add_argument("--model", type=Path,
+                    help="the .tflite flashed to the device; defaults to the baseline. "
+                         "Must match what the firmware embeds or every row mismatches.")
     ap.add_argument("--csv", type=Path, help="write per-image results here")
     args = ap.parse_args()
     if not args.images and not args.samples:
         ap.error("give image paths, or --samples")
 
-    interp = host_reference.make_interpreter()
+    interp = host_reference.make_interpreter(args.model)
 
     jobs: list[tuple[str, str, np.ndarray]] = []
     if args.samples:
