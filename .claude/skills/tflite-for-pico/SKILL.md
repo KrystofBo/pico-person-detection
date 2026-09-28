@@ -37,6 +37,21 @@ conv.inference_output_type = tf.int8
 2. An unspecified batch size emits `SHAPE`, `STRIDED_SLICE`, `PACK`: the converter builds a runtime
    shape computation and `Reshape` pulls them in. `batch_size=1` makes it static.
 
+## Never flash an untrained model
+
+Random weights give some channels a near-zero range, so quantisation produces
+scales around 1e-12. The requantisation multiplier and shift derived from those
+go out of range, and shifting by >= 32 bits is undefined behaviour: the firmware
+hard-faults before printing anything, USB never comes up, and `picotool load -f`
+cannot recover it. Only the BOOTSEL button can.
+
+This is not a memory problem and more arena will not fix it. Check before
+flashing anything:
+
+```bash
+python tools/check_scales.py model.tflite     # exits 1 on scales below 1e-9
+```
+
 ## Verify
 
 ```bash
