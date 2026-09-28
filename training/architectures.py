@@ -24,7 +24,7 @@ import model_v3
 ARCHITECTURES = {
     "v1": (model, 0.25),
     "v3": (model_v3, 0.35),
-    "mcunet": (model_mcunet, 0.5),
+    "mcunet": (model_mcunet, 0.6),
 }
 NAMES = tuple(ARCHITECTURES)
 
