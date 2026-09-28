@@ -323,6 +323,55 @@ parameter count unchanged. **9% of inference time for no change in arithmetic.**
 Caveat on generalising: this measures a 3x3 convolution over a *single* input channel, a degenerate
 case for im2col. It does not establish the cost of a 3x3 convolution over many channels.
 
+### Experiment: MobileNetV3-Small
+
+Branch `experiment/mobilenetv3`, not merged. Recorded here because the result is evidence either way.
+
+MobileNetV3-Small, faithful - squeeze-excite, h-swish, inverted residuals - retargeted from 224 to 96
+and trained with **the same recipe as run 2**, so architecture is the only variable. alpha=0.35 gives
+205,730 parameters against v1's 218,914, so capacity matches within 6%.
+
+Two adaptations were forced by the device, both arithmetically neutral: squeeze-excite built from
+`AveragePooling2D` + two 1x1 convolutions rather than `GlobalAveragePooling2D` + `Dense` (which emits
+`MEAN` and `FULLY_CONNECTED`), and a depthwise stem. The firmware gained `ADD`, `MUL` and `HARD_SWISH`,
++30 KB of flash.
+
+| | params | MACs | int8 bytes | device ms | test acc | recall |
+|---|---|---|---|---|---|---|
+| v1 pretrained baseline | 210,708 | 7.16 M | 300,568 | **99.1** | **76.0%** | 69.8% |
+| v1 ours, run 2 | 218,914 | 7.16 M | 303,496 | 108.7 | 72.0% | 67.6% |
+| **v3-Small ours, run 3** | 205,730 | ~1.2 M | 341,312 | **112.3** | **70.2%** | 63.2% |
+
+**MobileNetV3 lost on every axis.** Less accurate, slower, and larger on disk despite six times fewer
+MACs and fewer parameters.
+
+Per-operator profile on device, one inference:
+
+| op | count | ms | share | MACs |
+|---|---|---|---|---|
+| `HARD_SWISH` | 19 | **40.6** | **36%** | none |
+| `DEPTHWISE_CONV_2D` | 12 | 37.7 | 34% | |
+| `CONV_2D` | 42 | 20.0 | 18% | |
+| `MUL` (squeeze-excite rescale) | 18 | 10.2 | 9% | none |
+| `ADD` (residuals) | 7 | 2.3 | 2% | none |
+| `AVERAGE_POOL_2D` | 10 | 1.3 | 1% | |
+
+**h-swish alone is 36% of inference for zero arithmetic**, and with squeeze-excite's `MUL` it is 45%
+of the time in zero-MAC elementwise operations. Only 18% goes to `CONV_2D`. MobileNetV3's innovations
+buy accuracy per MAC, which is the right currency on a mobile CPU or NPU; on a Cortex-M33 with
+CMSIS-NN it is the wrong one, because convolution has good kernels and elementwise work over whole
+feature maps does not. ReLU6, by contrast, is free - it folds into the convolution.
+
+Model size is also worse for a structural reason: 110 operators carry much more flatbuffer metadata
+than v1's 31, which outweighs having fewer weights.
+
+**How far the conclusion goes.** The latency result is architectural and solid: h-swish and the
+squeeze-excite rescale cost what they cost regardless of how the network was trained. The accuracy
+result is narrower - v3 was trained with v1's recipe (Adam, cosine decay, the same augmentation) on
+40,000 images, where MobileNetV3 was originally trained with RMSProp, dropout and label smoothing on
+far more data. A recipe tuned for v3 might well close the 1.8 point gap. What can be said is that
+v3-Small at matched capacity, given v1's recipe and this much data, is worse on both axes.
+
 ### Problems found while building it
 
 **Keras precision and recall were silently wrong.** `keras.metrics.Precision(class_id=1)` slices
