@@ -16,20 +16,27 @@
 #include "tensorflow/lite/micro/micro_profiler_interface.h"
 #include "tensorflow/lite/schema/schema_generated.h"
 
-// MobileNet v1 uses 82,308 bytes. MobileNetV3-Small needs more, and its
-// requirement is not predictable from the host, so this is generous; the
-// firmware prints what was actually used.
-constexpr int kTensorArenaSize = 100 * 1024;
+// EXTENDED_OPS trades flash and SRAM for the three operators MobileNetV3 needs.
+// Off by default: a MobileNet v1 model uses none of them, and enabling it costs
+// ~30 KB of flash and ~50 KB of SRAM for nothing. The person_detect_*_custom
+// targets turn it on, since a generated model may be either architecture.
+#ifndef EXTENDED_OPS
+#define EXTENDED_OPS 0
+#endif
+
+// v1 uses 82,308 bytes of arena; v3-Small measured 79,428 but needs a much
+// larger model buffer. The firmware prints what was actually used.
+constexpr int kTensorArenaSize = (EXTENDED_OPS ? 100 : 88) * 1024;
 alignas(16) static uint8_t tensor_arena[kTensorArenaSize];
 
 #if MODEL_IN_SRAM
 // Both cores stream weights over the same QSPI port through one shared 16 KB
 // XIP cache, so splitting a layer whose weights exceed the cache makes it
 // slower, not faster. Copying the model into SRAM removes flash from the inner
-// loop entirely. Sized for MobileNetV3-Small's 341,312 bytes; checked at startup.
-// v3's 110 operators carry far more flatbuffer overhead than v1's 31, so it is
-// the larger file despite having fewer parameters.
-alignas(16) static uint8_t model_sram[336 * 1024];
+// loop entirely. v1 is 303,496 bytes; v3-Small is 341,312, because its 110
+// operators carry far more flatbuffer overhead than v1's 31 despite having
+// fewer parameters. Checked against the real length at startup.
+alignas(16) static uint8_t model_sram[(EXTENDED_OPS ? 336 : 301) * 1024];
 #endif
 
 // TFLM's own MicroProfiler statically reserves ~80 KB for 4096 events. MobileNet
@@ -92,18 +99,18 @@ int main() {
 
     const tflite::Model* model = tflite::GetModel(model_data);
 
-    static tflite::MicroMutableOpResolver<8> resolver;
+    static tflite::MicroMutableOpResolver<EXTENDED_OPS ? 8 : 5> resolver;
     resolver.AddAveragePool2D(tflite::Register_AVERAGE_POOL_2D_INT8());
     resolver.AddConv2D(tflite::Register_CONV_2D_INT8());
     resolver.AddDepthwiseConv2D(tflite::Register_DEPTHWISE_CONV_2D_INT8());
     resolver.AddReshape();
     resolver.AddSoftmax(tflite::Register_SOFTMAX_INT8());
-    // MobileNetV3 needs three more: residual connections (ADD), the
-    // squeeze-excite rescale (MUL) and h-swish. MobileNet v1 models do not use
-    // them, so this only costs a little flash for those.
+#if EXTENDED_OPS
+    // MobileNetV3: residual connections, the squeeze-excite rescale, and h-swish.
     resolver.AddAdd();
     resolver.AddMul();
     resolver.AddHardSwish();
+#endif
 
     static tflite::MicroInterpreter interpreter(model, resolver, tensor_arena,
                                                 kTensorArenaSize, nullptr, &profiler);

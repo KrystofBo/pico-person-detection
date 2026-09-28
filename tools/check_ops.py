@@ -9,13 +9,16 @@ from pathlib import Path
 
 import tflite
 
-# Registered in firmware/*/main.cpp via MicroMutableOpResolver<8>. Keep in step
-# with those files: this is what decides whether a model can run on the device.
-PICO_OPS = {
-    "AVERAGE_POOL_2D", "CONV_2D", "DEPTHWISE_CONV_2D", "RESHAPE", "SOFTMAX",
-    # Added for MobileNetV3: residuals, squeeze-excite rescale, h-swish.
-    "ADD", "MUL", "HARD_SWISH",
-}
+# What firmware/*/main.cpp registers. Keep in step with those files: this is what
+# decides whether a model can run on the device.
+BASE_OPS = {"AVERAGE_POOL_2D", "CONV_2D", "DEPTHWISE_CONV_2D", "RESHAPE", "SOFTMAX"}
+
+# Only registered when the firmware is built with EXTENDED_OPS=1, which the
+# person_detect_*_custom targets do. MobileNetV3 needs all three; MobileNet v1
+# needs none. Enabling them costs ~30 KB of flash and ~50 KB of SRAM.
+EXTENDED_OPS = {"ADD", "MUL", "HARD_SWISH"}
+
+PICO_OPS = BASE_OPS | EXTENDED_OPS
 
 
 def model_ops(blob: bytes) -> list[str]:
@@ -32,13 +35,19 @@ def model_ops(blob: bytes) -> list[str]:
 def main() -> None:
     if len(sys.argv) != 2:
         sys.exit(__doc__)
-    ops = model_ops(Path(sys.argv[1]).read_bytes())
-    unsupported = sorted(set(ops) - PICO_OPS)
-    print("ops        :", ", ".join(ops))
+    ops = set(model_ops(Path(sys.argv[1]).read_bytes()))
+    unsupported = sorted(ops - PICO_OPS)
+    needs_extended = sorted(ops & EXTENDED_OPS)
+    print("ops        :", ", ".join(sorted(ops)))
     if unsupported:
         print("UNSUPPORTED:", ", ".join(unsupported))
+        print("             register these in firmware/*/main.cpp and raise the resolver size")
         sys.exit(1)
-    print("UNSUPPORTED: none")
+    if needs_extended:
+        print("UNSUPPORTED: none, but needs EXTENDED_OPS=1 for:", ", ".join(needs_extended))
+        print("             the person_detect_*_custom targets build with it")
+    else:
+        print("UNSUPPORTED: none - runs on the default firmware")
 
 
 if __name__ == "__main__":

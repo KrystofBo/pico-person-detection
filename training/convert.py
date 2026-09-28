@@ -24,9 +24,8 @@ import tensorflow as tf
 from ai_edge_litert.interpreter import Interpreter, OpResolverType
 from tensorflow import keras
 
+import architectures
 import data as D
-import model as M
-import model_v3 as M3
 
 import sys
 sys.path.insert(0, str(D.REPO / "tools"))
@@ -76,7 +75,7 @@ def main() -> None:
     # not registered for serialisation, and loading them would fail. Conversion and
     # evaluation need only the architecture and weights.
     trained = keras.models.load_model(args.run / "best.keras", compile=False)
-    export = (M if arch == "v1" else M3).build_for_export(alpha=alpha, weights_from=trained)
+    export = architectures.build_for_export(arch, alpha, weights_from=trained)
 
     converter = tf.lite.TFLiteConverter.from_keras_model(export)
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
