@@ -49,8 +49,15 @@ def _separable(x, filters: int, stride: int, alpha: float, index: int):
 
 def _build(alpha: float, blocks, batch_size: int | None) -> keras.Model:
     inp = keras.Input((INPUT_SIZE, INPUT_SIZE, 1), batch_size=batch_size, name="image")
-    x = keras.layers.Conv2D(_width(STEM_FILTERS, alpha), 3, strides=2, padding="same",
-                            use_bias=False, name="stem")(inp)
+    # Expressed as a depthwise conv with depth_multiplier, not Conv2D. With a
+    # single input channel the two are arithmetically identical - each output
+    # channel is the input convolved with its own 3x3 kernel - but they hit
+    # different CMSIS-NN kernels, and the difference is large: measured on
+    # device, CONV_2D 3x3 takes 17.4 ms against DEPTHWISE_CONV_2D's 7.7 ms for
+    # the same 165,888 MACs, 9% of total inference time. See the step 04 journal.
+    x = keras.layers.DepthwiseConv2D(3, strides=2, padding="same", use_bias=False,
+                                     depth_multiplier=_width(STEM_FILTERS, alpha),
+                                     name="stem")(inp)
     x = keras.layers.BatchNormalization(name="stem_bn")(x)
     x = keras.layers.ReLU(6.0, name="stem_relu")(x)
 

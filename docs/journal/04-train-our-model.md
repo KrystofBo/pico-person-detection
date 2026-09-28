@@ -286,6 +286,43 @@ either. Nothing has been flashed: at 4.0 points below the baseline this model wo
 worse, and the deployment tooling (a .tflite to C array converter and a firmware target that embeds
 it) does not exist yet.
 
+### Flashed to the device
+
+Run 2's int8 model was flashed purely to validate the path, not because it is worth deploying.
+`tools/tflite_to_c.py` emits the same symbols pico-tflmicro's model file declares, so the
+`person_detect_serial_custom` target links it with `main.cpp` untouched.
+
+**Device and host agree bit-exactly on all 10 sample images**, and arena use is identical to the
+baseline at 82,308 B. The whole chain - Keras, int8 conversion, C array, flash, USB - is sound.
+
+### The 3x3 convolution cost, finally measured
+
+Our model ran at **108.2 ms against the baseline's 98.6 ms** despite identical topology. Per-op
+profiling found the entire 9.6 ms in one operator:
+
+| stem | op | time | MACs | ns/MAC |
+|---|---|---|---|---|
+| baseline | `DEPTHWISE_CONV_2D`, depth_multiplier 8 | 7,686 us | 165,888 | 46.3 |
+| ours (Keras `Conv2D`) | `CONV_2D` 3x3 | **17,351 us** | 165,888 | **104.6** |
+
+Every other operator matched within noise. This fills the gap flagged earlier: there was no
+measurement for a 3x3 standard convolution because the baseline contains none.
+
+| | ns/MAC |
+|---|---|
+| conv 1x1 (pointwise) | 10.4 |
+| depthwise 3x3 | 35.3 |
+| depthwise 3x3, depth_multiplier 8, 1 input channel | 46.3 |
+| **conv 3x3, 1 input channel** | **104.6** |
+
+With one input channel the two stem formulations are arithmetically identical - each output channel is
+the input convolved with its own 3x3 kernel - so `model.py` now builds the stem as
+`DepthwiseConv2D(depth_multiplier=8)`. Verified to convert to `DEPTHWISE_CONV_2D [1,3,3,8]` with the
+parameter count unchanged. **9% of inference time for no change in arithmetic.**
+
+Caveat on generalising: this measures a 3x3 convolution over a *single* input channel, a degenerate
+case for im2col. It does not establish the cost of a 3x3 convolution over many channels.
+
 ### Problems found while building it
 
 **Keras precision and recall were silently wrong.** `keras.metrics.Precision(class_id=1)` slices

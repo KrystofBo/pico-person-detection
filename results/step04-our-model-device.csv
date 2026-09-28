@@ -1,0 +1,11 @@
+input,label,device_person,device_no_person,host_person,host_no_person,p_person,device_us,agree
+nonperson_01.jpg,nonperson,-78,78,-78,78,0.1953,108603,True
+nonperson_02.jpg,nonperson,-22,22,-22,22,0.4141,108287,True
+nonperson_03.jpg,nonperson,-88,88,-88,88,0.1562,108343,True
+nonperson_04.jpg,nonperson,-111,111,-111,111,0.0664,108117,True
+nonperson_05.jpg,nonperson,-58,58,-58,58,0.2734,107967,True
+person_01.jpg,person,125,-125,125,-125,0.9883,108221,True
+person_02.jpg,person,7,-7,7,-7,0.5273,108172,True
+person_03.jpg,person,113,-113,113,-113,0.9414,107981,True
+person_04.jpg,person,40,-40,40,-40,0.6562,108208,True
+person_05.jpg,person,122,-122,122,-122,0.9766,107947,True

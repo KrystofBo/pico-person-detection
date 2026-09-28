@@ -23,3 +23,21 @@ foreach(variant person_detect_profile person_detect_profile_sram)
 endforeach()
 
 target_compile_definitions(person_detect_profile_sram PRIVATE MODEL_IN_SRAM=1)
+
+# Per-op profile of a trained model, for filling gaps in the cost model.
+# Needs firmware/generated/model_data.cpp (tools/tflite_to_c.py).
+set(CUSTOM_MODEL ${CMAKE_CURRENT_LIST_DIR}/../generated/model_data.cpp)
+if(EXISTS ${CUSTOM_MODEL})
+    add_executable(person_detect_profile_custom
+        main.cpp
+        ${TFLM_EXAMPLE}/model_settings.cpp
+        ${TFLM_PERSON_MODEL}/person_image_data.cpp
+        ${CUSTOM_MODEL}
+    )
+    target_include_directories(person_detect_profile_custom PRIVATE ${TFLM_EXAMPLE} ${TFLM_PERSON_MODEL})
+    target_compile_definitions(person_detect_profile_custom PRIVATE MODEL_IN_SRAM=1)
+    target_link_libraries(person_detect_profile_custom pico_stdlib pico-tflmicro)
+    pico_enable_stdio_usb(person_detect_profile_custom 1)
+    pico_enable_stdio_uart(person_detect_profile_custom 0)
+    pico_add_extra_outputs(person_detect_profile_custom)
+endif()
