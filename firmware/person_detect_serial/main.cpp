@@ -39,7 +39,7 @@ alignas(16) static uint8_t tensor_arena[kTensorArenaSize];
 // flash makes them contend for the shared XIP cache. See the step 02 journal.
 // v1 is 303,496 bytes; v3-Small is 341,312, because its 110 operators carry far
 // more flatbuffer overhead than v1's 31 despite having fewer parameters.
-alignas(16) static uint8_t model_sram[(EXTENDED_OPS ? 282 : 301) * 1024];
+alignas(16) static uint8_t model_sram[(EXTENDED_OPS ? 296 : 301) * 1024];
 
 constexpr int kInputBytes = kNumCols * kNumRows * kNumChannels;
 

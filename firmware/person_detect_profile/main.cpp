@@ -36,7 +36,7 @@ alignas(16) static uint8_t tensor_arena[kTensorArenaSize];
 // loop entirely. v1 is 303,496 bytes; v3-Small is 341,312, because its 110
 // operators carry far more flatbuffer overhead than v1's 31 despite having
 // fewer parameters. Checked against the real length at startup.
-alignas(16) static uint8_t model_sram[(EXTENDED_OPS ? 282 : 301) * 1024];
+alignas(16) static uint8_t model_sram[(EXTENDED_OPS ? 296 : 301) * 1024];
 #endif
 
 // TFLM's own MicroProfiler statically reserves ~80 KB for 4096 events. MobileNet
