@@ -372,6 +372,42 @@ result is narrower - v3 was trained with v1's recipe (Adam, cosine decay, the sa
 far more data. A recipe tuned for v3 might well close the 1.8 point gap. What can be said is that
 v3-Small at matched capacity, given v1's recipe and this much data, is worse on both axes.
 
+### Experiment: MCUNet
+
+Branch `experiment/mcunet`. The block table is the real `mcunet-5fps_vww` configuration from MIT HAN
+Lab, so the kernel sizes (3/5/7) and expansion ratios (1,3,4,5,6) are what TinyNAS searched rather
+than a guess. alpha=0.7 gives 208,922 weights against v1's 207,968, matching capacity to 0.5%.
+
+**This is MCUNet's architecture, not MCUNet.** MCUNet is TinyNAS plus TinyEngine; we run neither, so
+their published numbers are not comparable to these. One deliberate deviation: the searched resolution
+is 80 and this was built at 96, to hold input constant against v1 and v3.
+
+| | test acc | precision | recall | F1 | model | arena | device ms |
+|---|---|---|---|---|---|---|---|
+| baseline (pretrained) | **76.0%** | 79.7% | 69.8% | 74.5% | 300,568 | 82,308 | **99.1** |
+| v1 ours, run 2 | 72.0% | 74.1% | 67.6% | 70.7% | 303,496 | 82,308 | 108.7 |
+| v3-Small, run 3 | 70.2% | 73.6% | 63.2% | 68.0% | 341,312 | 79,428 | 112.3 |
+| **MCUNet, run 4** | **74.9%** | 77.9% | 69.5% | 73.5% | 356,288 | **180,916** | **251.0** |
+
+**Best accuracy of anything we have trained**: +2.9 points over v1, 1.1 below the baseline, with
+recall essentially matched (69.5% against 69.8%). Quantisation cost 0.0%. Only 59 operators, and the
+sole addition beyond the base five is `ADD` - the architecture suits this chip, unlike v3.
+
+**But it does not fit.** Peak activation memory is 180,916 bytes against v1's 82,308, so
+356,288 + 180,916 + ~23,000 = 560,204 bytes against 520 KB of SRAM. The model has to stay in flash,
+where both cores contend for the one 16 KB XIP cache (the step 02 fix), and inference takes 251 ms
+rather than 99.
+
+**The deviation caused this, and that is the interesting part.** Peak activation memory is exactly
+what TinyNAS optimises, and resolution is one of the variables it searches to control it. At the
+searched resolution of 80, activations scale by (80/96)^2 and the arena would be roughly 125 KB,
+which together with the model would fit in SRAM. Building at 96 for comparability broke the very
+budget the architecture was designed around. The lesson is not that MCUNet is too big; it is that
+MCUNet's resolution is not a free parameter.
+
+Untried follow-up: a narrower MCUNet, or one built at resolution 80. Both would change the input
+pipeline or the capacity match, so neither is a like-for-like comparison with the runs above.
+
 ### Problems found while building it
 
 **Keras precision and recall were silently wrong.** `keras.metrics.Precision(class_id=1)` slices
