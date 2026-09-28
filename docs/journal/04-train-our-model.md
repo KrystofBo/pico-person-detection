@@ -447,6 +447,36 @@ Untried: MCUNet at its searched resolution of 80, and stripping the 67,584 bytes
 vectors from the flatbuffer - 8 bytes per channel, zero for 8,391 of 8,448 entries. That would be
 enough to fit alpha=0.7, but with alpha=0.6 only 0.8 points behind, it would buy little.
 
+**Rejected: replacing the 5x5 and 7x7 depthwise kernels with 3x3.** The cost model says this is worth
+about 57 ms, a quarter of inference, because those six operators cost 65.5 ms today and at 3x3 would
+need 9/49 and 9/25 of the MACs while also hitting the faster kernel. Not done: those kernel sizes are
+what TinyNAS searched for accuracy, and trading them for latency would most likely give back more
+accuracy than the time is worth. Recorded because the size of the saving makes it a tempting mistake.
+
+## Operator cost model
+
+Measured across four models on the device, at 150 MHz with the dual-core CMSIS-NN kernels.
+
+| operation | cost | note |
+|---|---|---|
+| ReLU / ReLU6 | **free** | fused into the convolution, no runtime operator |
+| BatchNorm | **free** | folded into the weights at conversion |
+| conv 1x1 (pointwise) | 10.4 - 16.1 ns/MAC | best-optimised path; SMLAD, split across both cores |
+| depthwise 3x3 | 35.6 ns/MAC | 3.4x pointwise; one multiply per weight load |
+| depthwise 5x5 / 7x7 | **63.7 - 71.0 ns/MAC** | CMSIS-NN hand-optimises only 3x3; the rest fall through |
+| conv 3x3, 1 input channel | 104.6 ns/MAC | im2col on a degenerate shape |
+| `ADD` | 497 - 577 ns/element | zero MACs |
+| `MUL` | 497 ns/element | zero MACs |
+| h-swish | **709 ns/element** | zero MACs |
+
+Depthwise 3x3 measured 35.3 ns/MAC in MobileNet v1 and 35.6 in MCUNet, independently, which is some
+evidence the model holds.
+
+**The rule worth carrying forward: zero-MAC elementwise operators are not free, they are among the
+most expensive things available.** h-swish does no arithmetic at all and took 36% of MobileNetV3's
+inference. Anything that touches every element of a feature map costs roughly 500-700 ns per element
+whatever it computes. Design against the operator mix, not the MAC count.
+
 ### Problems found while building it
 
 **Keras precision and recall were silently wrong.** `keras.metrics.Precision(class_id=1)` slices
