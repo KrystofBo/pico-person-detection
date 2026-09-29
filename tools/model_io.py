@@ -56,8 +56,19 @@ def embedded_sample(name: str) -> np.ndarray:
     return np.frombuffer(raw, dtype=np.int8).reshape(INPUT_H, INPUT_W, 1)
 
 
+def centre_square(width: int, height: int) -> tuple[int, int, int]:
+    """-> (left, top, side) of the centred square every image is cropped to."""
+    side = min(width, height)
+    return (width - side) // 2, (height - side) // 2, side
+
+
 def preprocess(path: Path) -> np.ndarray:
-    """Image file -> (96, 96, 1) int8, the exact bytes the Pico's input tensor wants.
+    """Image file -> (96, 96, 1) int8, the exact bytes the Pico's input tensor wants."""
+    return preprocess_image(Image.open(path))
+
+
+def preprocess_image(im: Image.Image) -> np.ndarray:
+    """Image -> (96, 96, 1) int8, the exact bytes the Pico's input tensor wants.
 
     Centre-crops to a square before resizing, so the aspect ratio is preserved
     rather than squashed.
@@ -68,9 +79,8 @@ def preprocess(path: Path) -> np.ndarray:
     integer pixel; the two differ by at most half a quantisation step, and
     matching upstream keeps our bytes identical to the embedded samples'.
     """
-    im = Image.open(path).convert("L")
-    side = min(im.size)
-    left, top = (im.width - side) // 2, (im.height - side) // 2
+    im = im.convert("L")
+    left, top, side = centre_square(im.width, im.height)
     im = im.crop((left, top, left + side, top + side))
     im = im.resize((INPUT_W, INPUT_H), Image.BILINEAR)
     pixels = np.asarray(im, dtype=np.int16)
