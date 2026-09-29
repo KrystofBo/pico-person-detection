@@ -159,10 +159,12 @@ timed per-op on device. Neither exists yet.
 
 ## Open
 
-- Dataset not yet supplied: path, layout, label form (presence flags or boxes) unknown.
-- Latency budget undefined. 99 ms is the current cost; no target frame rate has been set.
-- Preprocessing: centre-crop beat squash and letterbox on the 10-image sample set (10/10 vs 9/10 vs
-  7/10), but n=10 is not a result. Train and deploy with whichever is chosen, so the two match.
+- **Dataset - resolved.** The Wake Vision subset below.
+- **Latency budget - still undefined.** No target frame rate has been set. v1 runs at 98.5 ms and
+  MCUNet at 198.8 ms (see [On the device](#on-the-device)).
+- **Preprocessing - resolved: centre-crop.** Training data (`tools/build_wake_vision.py`) and
+  inference (`tools/model_io.py`) both centre-crop to square and resize bilinearly to 96x96
+  greyscale, so the two match.
 
 ## Dataset
 
@@ -190,6 +192,14 @@ camera actually produces.
 Build cost: 268,552 rows streamed for the 40,000 training images (14.9% yield) in 147 min. Yield falls
 towards the end of a run because the commoner class fills first and its rows are then discarded.
 
+### Extension to 80,000 (runs 6-8)
+
+Runs 0-5 used the 40,000 above. A second 40,000 came from the same `train_quality` split, starting at
+shard 160 of its 690 (`--start-file 160`), past the shards the first build read: 267,749 rows streamed,
+14.9% yield, 160 min, exactly 20,000 per class. `--start-file` seeks straight to a shard, where
+`--skip-rows` would have streamed the 268,552 skipped rows again first. Train is now 80,000
+(40,000 / 40,000); all three splits take 684 MB.
+
 ### Integrity
 
 | check | result |
@@ -199,8 +209,8 @@ towards the end of a run because the commoner class fills first and its rows are
 | val vs test | 1 shared image (0.01%) |
 | internal duplicates | 0 train, 0 val, 1 test |
 
-Verified by sha1 over raw pixels. Train is clean against both evaluation sets, so evaluation is
-unbiased.
+Verified by sha1 over raw pixels, at 40,000 training images and again at 80,000 with the same
+result. Train is clean against both evaluation sets, so evaluation is unbiased.
 
 ## Baseline measurement
 
@@ -208,11 +218,18 @@ The bar to beat, measured with `tools/host_reference.py` (bit-exact against the 
 
 | | accuracy | precision | recall | F1 |
 |---|---|---|---|---|
-| pretrained baseline, test (n=9,000) | **76.0%** | 79.7% | 69.8% | 74.5% |
-| pretrained baseline, validation (n=3,000) | 75.5% | 78.6% | 70.1% | 74.1% |
+| pretrained baseline, test (n=9,000) | **76.1%** | 79.8% | 69.7% | 74.4% |
+| pretrained baseline, validation (n=3,000) | 75.4% | 78.7% | 69.7% | 73.9% |
 | trivial mean-brightness threshold | 55.8% | - | - | - |
 
-Confusion on test: tp 3,143 · tn 3,700 · fp 800 · **fn 1,357**.
+Confusion on test: tp 3,138 · tn 3,708 · fp 792 · **fn 1,362**.
+
+**Restated under argmax.** A prediction is the argmax of the two output scores, as `convert.py` scores
+our models, so a tie counts as no person. These figures were first recorded with P(person) >= 0.5,
+which counts a tie as a person: 76.0% on test (tp 3,143 · tn 3,700 · fp 800 · fn 1,357) and 75.5% on
+validation. The int8 output makes exact ties possible - P = 128/256 - and the baseline has 13 on test
+(5 person, 8 not) and 8 on validation. Every baseline figure in this journal now uses argmax; no
+conclusion changed.
 
 Two observations:
 
@@ -274,7 +291,7 @@ guards passed: the op set came out as exactly the five registered ops, and input
 
 | | accuracy | precision | recall | F1 |
 |---|---|---|---|---|
-| baseline | **76.0%** | 79.7% | 69.8% | 74.5% |
+| baseline | **76.1%** | 79.8% | 69.7% | 74.4% |
 | run2 float | 72.2% | 74.3% | 68.0% | 71.0% |
 | run2 int8 | 72.0% | 74.1% | 67.6% | 70.7% |
 
@@ -325,7 +342,7 @@ case for im2col. It does not establish the cost of a 3x3 convolution over many c
 
 ### Experiment: MobileNetV3-Small
 
-Branch `experiment/mobilenetv3`, not merged. Recorded here because the result is evidence either way.
+Branch `experiment/mobilenetv3`, since merged as an optional architecture (`--arch v3`). Recorded here because the result is evidence either way.
 
 MobileNetV3-Small, faithful - squeeze-excite, h-swish, inverted residuals - retargeted from 224 to 96
 and trained with **the same recipe as run 2**, so architecture is the only variable. alpha=0.35 gives
@@ -338,7 +355,7 @@ Two adaptations were forced by the device, both arithmetically neutral: squeeze-
 
 | | params | MACs | int8 bytes | device ms | test acc | recall |
 |---|---|---|---|---|---|---|
-| v1 pretrained baseline | 210,708 | 7.16 M | 300,568 | **99.1** | **76.0%** | 69.8% |
+| v1 pretrained baseline | 210,708 | 7.16 M | 300,568 | **99.1** | **76.1%** | 69.7% |
 | v1 ours, run 2 | 218,914 | 7.16 M | 303,496 | 108.7 | 72.0% | 67.6% |
 | **v3-Small ours, run 3** | 205,730 | ~1.2 M | 341,312 | **112.3** | **70.2%** | 63.2% |
 
@@ -384,13 +401,13 @@ is 80 and this was built at 96, to hold input constant against v1 and v3.
 
 | | test acc | precision | recall | F1 | model | arena | device ms |
 |---|---|---|---|---|---|---|---|
-| baseline (pretrained) | **76.0%** | 79.7% | 69.8% | 74.5% | 300,568 | 82,308 | **99.1** |
+| baseline (pretrained) | **76.1%** | 79.8% | 69.7% | 74.4% | 300,568 | 82,308 | **99.1** |
 | v1 ours, run 2 | 72.0% | 74.1% | 67.6% | 70.7% | 303,496 | 82,308 | 108.7 |
 | v3-Small, run 3 | 70.2% | 73.6% | 63.2% | 68.0% | 341,312 | 79,428 | 112.3 |
 | **MCUNet, run 4** | **74.9%** | 77.9% | 69.5% | 73.5% | 356,288 | **180,916** | **251.0** |
 
 **Best accuracy of anything we have trained**: +2.9 points over v1, 1.1 below the baseline, with
-recall essentially matched (69.5% against 69.8%). Quantisation cost 0.0%. Only 59 operators, and the
+recall essentially matched (69.5% against 69.7%). Quantisation cost 0.0%. Only 59 operators, and the
 sole addition beyond the base five is `ADD` - the architecture suits this chip, unlike v3.
 
 **But it does not fit.** Peak activation memory is 180,916 bytes against v1's 82,308, so
@@ -416,7 +433,7 @@ buffer to the model rather than rounding up.
 
 | | test acc | precision | recall | F1 | model | arena | device ms |
 |---|---|---|---|---|---|---|---|
-| baseline (pretrained) | **76.0%** | 79.7% | **69.8%** | 74.5% | 300,568 | 82,308 | **99.1** |
+| baseline (pretrained) | **76.1%** | 79.8% | **69.7%** | 74.4% | 300,568 | 82,308 | **99.1** |
 | v1 ours, run 2 | 72.0% | 74.1% | 67.6% | 70.7% | 303,496 | 82,308 | 108.7 |
 | v3-Small, run 3 | 70.2% | 73.6% | 63.2% | 68.0% | 341,312 | 79,428 | 112.3 |
 | MCUNet a=0.7, run 4 | 74.9% | 77.9% | 69.5% | 73.5% | 356,288 | 180,916 | 251 (flash) |
@@ -426,7 +443,7 @@ Narrowing cost 0.8 points of accuracy and 3.0 of recall for 20% fewer weights. D
 bit-exactly on all 10 sample images.
 
 **MCUNet is the best architecture we trained and still loses to the pretrained baseline on both
-axes**: 74.1% against 76.0%, and 199.5 ms against 99.1.
+axes**: 74.1% against 76.1%, and 199.5 ms against 99.1.
 
 The profile says why it is slow. Depthwise convolution is 104.0 ms of the 199.5 - **52%** - across 16
 operators. MCUNet's searched kernels are 5x5 and 7x7 as well as 3x3, and depthwise costs 35.3 ns/MAC
@@ -441,7 +458,8 @@ problem: raising the margin from 36,732 to 46,972 bytes changed nothing. Random 
 with a near-zero range, giving 2,562 quantisation scales below 1e-9 and a smallest of 1.68e-12; the
 requantisation shift derived from those goes out of range, and shifting by 32 or more bits is
 undefined behaviour, so the firmware dies before it can print and USB never enumerates.
-`tools/check_scales.py` now refuses such a model. Trained models sit around 6e-8.
+`tools/check_scales.py` now refuses such a model. Trained models sit around 6e-8 - though MCUNet
+at 80,000 images came within 2x of the limit, see below.
 
 Untried: MCUNet at its searched resolution of 80, and stripping the 67,584 bytes of `zero_point`
 vectors from the flatbuffer - 8 bytes per channel, zero for 8,391 of 8,448 entries. That would be
@@ -505,12 +523,12 @@ About 15 s per epoch on the GTX 1650.
 ## Results
 
 All figures are validation (n=3,000), so they compare like-for-like with the baseline measured on the
-same split (75.5%). Test numbers come from `convert.py` and are recorded when a model is worth
+same split (75.4%). Test numbers come from `convert.py` and are recorded when a model is worth
 deploying.
 
 | run | augment | best val acc | val precision | val recall | train acc at end | gap | stopped |
 |---|---|---|---|---|---|---|---|
-| baseline (pretrained) | - | 75.5% | 78.6% | 70.1% | - | - | - |
+| baseline (pretrained) | - | 75.4% | 78.7% | 69.7% | - | - | - |
 | run0-noaug | no | 63.8% | - | - | 84.7% | **23 pts** | epoch 26 (early) |
 | run1-aug | yes | **72.4%** | 77.2% | 63.6% | 78.6% | **6 pts** | epoch 60 (ran out) |
 
@@ -524,11 +542,11 @@ Two things the numbers say about where to go next:
   when the schedule ran out. Some of that late gain is the cosine decay annealing to zero, but the
   trajectory (0.668 at 21, 0.708 at 31, 0.717 at 51, 0.724 at 56) does not look finished. A longer
   schedule is the cheapest untried lever.
-- **Recall is the weak axis, and worse than the baseline's.** 63.6% against 70.1%, while precision is
-  close (77.2% vs 78.6%). The model is biased towards "no person" - the same failure the baseline has,
+- **Recall is the weak axis, and worse than the baseline's.** 63.6% against 69.7%, while precision is
+  close (77.2% vs 78.7%). The model is biased towards "no person" - the same failure the baseline has,
   slightly worse. Accuracy alone would hide this.
 
-| run2-aug-long | yes | **74.6%** | 77.0% | 70.0% | 80.4% | 5.8 pts | epoch 83 (early, best 58) |
+| run2-aug-long | yes | **74.6%** | 77.0% | 70.0% | 83.6% | 10.0 pts | epoch 83 (early, best 58) |
 
 Longer training is worth a further **+2.2 points**, and recall recovers from 63.6% to 70.0%, matching
 the baseline. But the lever is spent: validation peaked at epoch 58 and oscillated flat
@@ -542,15 +560,107 @@ validation; the baseline had no such selection. Test is the honest number.
 
 | | accuracy | precision | recall | F1 | false negatives |
 |---|---|---|---|---|---|
-| baseline (pretrained) | **76.0%** | 79.7% | 69.8% | 74.5% | 1,357 |
+| baseline (pretrained) | **76.1%** | 79.8% | 69.7% | 74.4% | 1,362 |
 | run2-aug-long (float) | 72.2% | 74.3% | 68.0% | 71.0% | 1,442 |
 
 **We have not beaten the baseline: 3.8 points short on test.** Note our model drops 2.4 points from
-validation to test while the baseline gains 0.5, which is the checkpoint-selection bias showing.
+validation to test while the baseline gains 0.6, which is the checkpoint-selection bias showing.
 
 Levers tried and their value: augmentation +8.6, longer schedule +2.2, both on validation. Untried:
 initialising from the pretrained weights instead of from scratch, and more data. The plateau at
 epoch 58 says the recipe is no longer the constraint.
+
+### 80,000 training images (runs 6-8)
+
+More data was the other untried lever. All three architectures were retrained on 80,000 images with
+run 2's recipe at their default widths (v1 α=0.25, v3 α=0.35, MCUNet α=0.6), `--epochs 150
+--patience 25`. All three stopped early, 25 epochs after their best. Baseline on validation: 75.4%.
+
+| | val acc, 40k | val acc, 80k | val precision | val recall | best / stopped epoch | time |
+|---|---|---|---|---|---|---|
+| v1, run 6 | 74.6% | **76.5%** | 81.0% | 69.2% | 81 / 106 | 52 min |
+| v3, run 7 | 71.7% | 74.4% | 80.6% | 64.3% | 65 / 90 | 38 min |
+| MCUNet, run 8 | 74.7% | **78.1%** | 85.8% | 67.5% | 73 / 98 | 76 min |
+
+The 40k column is runs 2, 3 and 5. On test, int8 - what runs on the device:
+
+| | accuracy | precision | recall | F1 | at 40k | vs baseline (95% CI) | McNemar p |
+|---|---|---|---|---|---|---|---|
+| baseline (pretrained) | 76.1% | 79.8% | 69.7% | 74.4% | | | |
+| v1, run 6 | 76.1% | 80.2% | 69.5% | 74.4% | 72.0% | +0.1 (-0.9 to +1.1) | 0.9 |
+| v3, run 7 | 72.8% | 81.2% | 59.3% | 68.6% | 70.2% | -3.3 (-4.3 to -2.2) | 4.5e-10 |
+| **MCUNet, run 8** | **77.9%** | **86.2%** | 66.6% | **75.1%** | 74.1% | **+1.9 (+0.9 to +2.8)** | 1.2e-4 |
+
+The comparison is paired: every model scores the same 9,000 images, and McNemar's exact test uses only
+the images on which exactly one of the two is right - for MCUNet, 1,040 it gets right that the baseline
+misses against 871 the other way; for v1, 1,037 against 1,030. Computed from per-image int8
+predictions with a one-off script, not kept in the repo.
+
+- **More data is worth +4.1 points (v1), +3.9 (MCUNet) and +2.6 (v3) on test**, the biggest lever
+  since augmentation, and it moved every architecture.
+- **MCUNet beats the baseline; v1 ties it.** v1 matches the baseline on every metric. The baseline
+  section called 76% a soft bar; for this architecture trained from scratch on 80,000 images, it is not.
+- **MCUNet's gain is all precision.** It raises 311 fewer false alarms (481 against 792) and misses 142
+  more people (1,504 against 1,362). No model closes the recall gap this step set out to close.
+- **Validation now predicts test.** Every 80k model is within 0.3 points of its validation accuracy on
+  test (float), against run 2's 2.4-point drop: with twice the data, selecting the checkpoint on
+  validation no longer inflates it.
+- **v3 stays out.** Quantisation now costs it 1.3 points (float 74.1%), against 0.3 at 40k, and its
+  recall is 59.3%.
+
+### On the device
+
+Each model on the firmware it would ship with - v1 like the baseline on the five base operators,
+MCUNet with `EXTENDED_OPS` - timed by the device around `Invoke()` in `person_detect_serial`, over the
+same 100 test images (the first 50 of each class), in one session. **All 300 scores matched the host
+reference bit-exactly.**
+
+| | test acc | latency, mean (sd) | range | arena | model | flash | SRAM used (free) |
+|---|---|---|---|---|---|---|---|
+| baseline (pretrained) | 76.1% | 98.56 ms (0.14) | 98.32-98.98 | 82,308 | 300,568 | 423,256 | 411,456 (112,832) |
+| v1, run 6 | 76.1% | **98.53 ms** (0.12) | 98.28-98.89 | 82,308 | 303,552 | 426,256 | 411,456 (112,832) |
+| MCUNet, run 8 | **77.9%** | **198.78 ms** (0.22) | 198.41-199.40 | 177,284 | 301,960 | 454,408 | 504,748 (19,540) |
+
+Bytes throughout. Raw data in `results/step04-speed-*.csv`; arena from the profile firmware,
+`results/step04-profile-*.txt`. SRAM is the 524,288 bytes that hold data, measured to the end of the
+heap in the linker map; the chip's other 8 KB of its 520 are the two cores' stacks.
+
+- **v1 is the baseline, reproduced**: the same arena to the byte and the same time to within 0.03 ms.
+- **MCUNet: +1.9 points for 2.02x the time**, about 5 inferences per second against 10, and 19 KB of
+  SRAM left free against v1's 110 KB. That SRAM is MCUNet's activations - a 184 KB arena buffer
+  against 88 KB; registering ADD, MUL and HARD_SWISH costs 108 bytes of it.
+- The profile firmware reads 0.3-0.4 ms higher for every model - 98.85 and 199.19 ms here, 98.9 for the
+  baseline in step 02 - consistent with the cost of its per-operator timing.
+
+#### Firmware changes this needed
+
+- **v1 did not fit the custom firmware.** The `*_custom` targets had been built with `EXTENDED_OPS=1`
+  for every model since the v3 experiment, and that layout shrinks the model buffer to 296 KB
+  (303,104 B) to make room for MCUNet's arena; v1-80k is 303,552 B. A CMake option,
+  `CUSTOM_EXTENDED_OPS`, now selects the layout: ON by default, as before, and OFF for v1, which gives
+  it exactly the baseline's configuration.
+- **The serial firmware copied the model without checking its length**, so v1 on the old layout would
+  have silently overwritten the 448 bytes after the buffer. It now stops with `ERR model_too_large`, as
+  the profile firmware already did. Cost: 72 bytes of flash.
+
+#### The flash gate passed MCUNet by only 2x
+
+`check_scales.py` reported a smallest scale of 2.0e-9 against its 1e-9 limit, where v1 and v3 sit near
+5e-6. It is the bias scale of `b14_project`, the last 1x1 convolution: 8 of its 96 output channels have
+near-zero weights, and a bias scale is input scale x weight scale. Bias scales never become shifts. The
+quantity that faults - each output channel's requantisation shift exponent - spans -24 to -4, against a
+limit of -31; v1 spans -12 to -5, and the 40k MCUNet that ran on the board -19 to -5. The model is safe;
+the gate measures a proxy that is now within 2x of rejecting a good model.
+
+### Decision
+
+**v1 stays the main model for now, because it has the lowest latency** - a provisional choice. MCUNet
+stays the optional architecture (`--arch mcunet`, firmware built with `EXTENDED_OPS`): +1.9 points on
+test for 2.02x the latency, lower recall, and 19 KB of SRAM left against v1's 110 KB.
+
+Against the objective - accuracy above the baseline on a held-out test set, with the model running on
+the Pico 2 - **only MCUNet succeeds**: 77.9% against 76.1% (p = 1.2e-4), at 198.8 ms, bit-exact on the
+device. The main model ties the baseline.
 
 ### Problems found
 
@@ -560,3 +670,19 @@ which meant every run was unconvertible and the whole deployment path was blocke
 loads with `compile=False`, since conversion and evaluation need only architecture and weights. It
 surfaced from evaluating a checkpoint by hand; going straight to conversion would have hit the same
 wall.
+
+**80,000 images did not fit on the GPU.** `data.py` scaled the whole split to float32 up front -
+80,000 x 96 x 96 x 4 B = 2.95 GB - and TensorFlow placed that on the GTX 1650 as a constant, so
+training died before its first step with `Dst tensor is not initialized`. Images now stay uint8 on
+the CPU (0.74 GB) and are scaled per batch; the inputs are bit-identical, and peak host memory fell
+from 10.3 to 4.6 GB.
+
+## Next
+
+- `check_scales.py`: gate on the requantisation exponent rather than on raw scales (see above).
+- Untried levers for the main model: initialising v1 from the pretrained weights, the likeliest way
+  for it to beat the baseline outright; and a decision threshold chosen on validation, to trade
+  MCUNet's extra precision for recall. MCUNet at its searched resolution of 80 is also still untried.
+- Step 05: a laptop webcam streamed to the Pico in real time, each frame preprocessed on the laptop to
+  96x96 greyscale, with the Pico sending back person / no person. Frames already arrive straight into
+  the input tensor, so the basic loop needs no more SRAM than today.
