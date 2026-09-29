@@ -51,6 +51,12 @@ endforeach()
 # tests and examples are only defined, not built.
 add_subdirectory(../third_party/pico-tflmicro pico-tflmicro EXCLUDE_FROM_ALL)
 
+# The *_custom targets link a generated model. v3 and mcunet need EXTENDED_OPS;
+# v1 needs none of its operators and is too large for the model buffer it leaves,
+# so a v1 model is built with -DCUSTOM_EXTENDED_OPS=OFF (tools/check_ops.py says
+# which a model needs). Cached, so set it explicitly whenever the model changes.
+option(CUSTOM_EXTENDED_OPS "Build the *_custom targets with EXTENDED_OPS=1" ON)
+
 add_subdirectory(hello)
 add_subdirectory(person_detect_embedded)
 add_subdirectory(person_detect_profile)

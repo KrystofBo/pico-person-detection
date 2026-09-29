@@ -228,3 +228,12 @@ __marimo__/
 
 # Training datasets are large and downloaded separately
 datasets/
+
+# Built Wake Vision subset (~480 MB of .npy); rebuild with tools/build_wake_vision.py
+data/wake-vision-96/
+data/wake-vision-96-png/
+training/logs/
+training/runs/
+
+# Generated C array of a trained model; regenerate with tools/tflite_to_c.py
+firmware/generated/

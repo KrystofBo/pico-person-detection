@@ -52,12 +52,15 @@ def main() -> None:
     ap.add_argument("--samples", action="store_true",
                     help="also send the two embedded int8 arrays (known ground truth)")
     ap.add_argument("--port", default="/dev/ttyACM0")
+    ap.add_argument("--model", type=Path,
+                    help="the .tflite flashed to the device; defaults to the baseline. "
+                         "Must match what the firmware embeds or every row mismatches.")
     ap.add_argument("--csv", type=Path, help="write per-image results here")
     args = ap.parse_args()
     if not args.images and not args.samples:
         ap.error("give image paths, or --samples")
 
-    interp = host_reference.make_interpreter()
+    interp = host_reference.make_interpreter(args.model)
 
     jobs: list[tuple[str, str, np.ndarray]] = []
     if args.samples:
@@ -86,8 +89,10 @@ def main() -> None:
                          "host_no_person": host_n, "p_person": round(prob, 4),
                          "device_us": dev_us, "agree": agree})
 
-    correct = sum((r["p_person"] >= 0.5) == (r["label"] == "person") for r in rows)
-    print(f"\n{correct}/{len(rows)} classified correctly at threshold 0.5")
+    # Argmax, as in training/convert.py: a tie (P = 0.5 exactly) is not a person.
+    correct = sum((r["device_person"] > r["device_no_person"]) == (r["label"] == "person")
+                  for r in rows)
+    print(f"\n{correct}/{len(rows)} classified correctly (argmax)")
     print(f"device/host agreement: {len(rows) - mismatches}/{len(rows)}")
 
     if args.csv:
