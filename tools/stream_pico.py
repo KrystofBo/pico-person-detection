@@ -89,8 +89,10 @@ def main() -> None:
                          "host_no_person": host_n, "p_person": round(prob, 4),
                          "device_us": dev_us, "agree": agree})
 
-    correct = sum((r["p_person"] >= 0.5) == (r["label"] == "person") for r in rows)
-    print(f"\n{correct}/{len(rows)} classified correctly at threshold 0.5")
+    # Argmax, as in training/convert.py: a tie (P = 0.5 exactly) is not a person.
+    correct = sum((r["device_person"] > r["device_no_person"]) == (r["label"] == "person")
+                  for r in rows)
+    print(f"\n{correct}/{len(rows)} classified correctly (argmax)")
     print(f"device/host agreement: {len(rows) - mismatches}/{len(rows)}")
 
     if args.csv:

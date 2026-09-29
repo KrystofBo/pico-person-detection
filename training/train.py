@@ -10,7 +10,7 @@ predictions with errors outlined in red, which is where label noise from crop
 damage shows up. Hyperparameters go to the HParams tab so ablation runs compare
 in one table.
 
-The bar to beat is the pretrained baseline's 76.0% accuracy on the same 9,000
+The bar to beat is the pretrained baseline's 76.1% accuracy on the same 9,000
 test images (docs/journal/04-train-our-model.md).
 """
 from __future__ import annotations

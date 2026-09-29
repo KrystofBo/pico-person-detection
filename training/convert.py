@@ -31,7 +31,9 @@ import sys
 sys.path.insert(0, str(D.REPO / "tools"))
 from check_ops import PICO_OPS, model_ops  # noqa: E402
 
-BASELINE = {"accuracy": 0.760, "precision": 0.797, "recall": 0.698, "f1": 0.745}
+# The pretrained model on the same test split, decided by argmax like everything
+# here: tp 3,138, tn 3,708, fp 792, fn 1,362 (n=9,000).
+BASELINE = {"accuracy": 0.7607, "precision": 0.7985, "recall": 0.6973, "f1": 0.7445}
 
 
 def metrics(y: np.ndarray, pred: np.ndarray) -> dict:
