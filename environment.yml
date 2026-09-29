@@ -29,3 +29,6 @@ dependencies:
       # TensorBoard 2.20 still imports pkg_resources, which setuptools removed
       # in 81. Without this pin `tensorboard` dies on ModuleNotFoundError.
       - setuptools<81
+      # Webcam capture and the preview window (tools/webcam_pico.py, step 05).
+      # Not the -headless build: the preview needs its Qt GUI, shown via WSLg.
+      - opencv-python==5.0.0.93
