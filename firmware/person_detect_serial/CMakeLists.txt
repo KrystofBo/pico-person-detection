@@ -29,11 +29,13 @@ if(EXISTS ${CUSTOM_MODEL})
         ${CUSTOM_MODEL}
     )
     target_include_directories(person_detect_serial_custom PRIVATE ${TFLM_EXAMPLE} ${TFLM_PERSON_MODEL})
-    # Either architecture may be generated here, so register the full op set.
-    target_compile_definitions(person_detect_serial_custom PRIVATE EXTENDED_OPS=1)
+    # CUSTOM_EXTENDED_OPS: see firmware/CMakeLists.txt.
+    target_compile_definitions(person_detect_serial_custom PRIVATE
+        EXTENDED_OPS=$<BOOL:${CUSTOM_EXTENDED_OPS}>)
     target_link_libraries(person_detect_serial_custom pico_stdlib pico-tflmicro)
     pico_enable_stdio_usb(person_detect_serial_custom 1)
     pico_enable_stdio_uart(person_detect_serial_custom 0)
     pico_add_extra_outputs(person_detect_serial_custom)
-    message(STATUS "person_detect_serial_custom: using ${CUSTOM_MODEL}")
+    message(STATUS "person_detect_serial_custom: using ${CUSTOM_MODEL}, "
+                   "CUSTOM_EXTENDED_OPS=${CUSTOM_EXTENDED_OPS}")
 endif()

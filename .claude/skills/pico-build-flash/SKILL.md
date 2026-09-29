@@ -21,6 +21,19 @@ The configure step applies `third_party/patches/*.patch` to the pico-tflmicro su
 - Re-configuring is safe; a patch that reverse-applies cleanly is skipped.
 - `git submodule update --force` or a submodule bump reverts/breaks the patches. Re-run the configure step to reapply; if it fails with "the patches need rebasing", regenerate them against the new commit.
 
+### Our own models: the `*_custom` targets
+`python tools/tflite_to_c.py <model>.tflite -o firmware/generated/model_data.cpp` writes the model. The
+`*_custom` targets exist only once that file does, so configure after writing it, choosing the layout the
+model needs (`tools/check_ops.py` says which):
+
+| `-DCUSTOM_EXTENDED_OPS=` | operators | arena | model buffer | for |
+|---|---|---|---|---|
+| `ON` (default) | the base five + ADD, MUL, HARD_SWISH | 184 KB | 296 KB | v3, MCUNet |
+| `OFF` | the base five | 88 KB | 301 KB | v1 |
+
+The setting is cached in the build directory, so pass it on every configure that changes the model. A
+mismatch stops the serial firmware with `ERR model_too_large` or `ERR allocate_tensors` instead of running.
+
 ## 2. Flash
 ```bash
 ~/opt/picotool/bin/picotool load -f -x firmware/build/<target>/<target>.uf2

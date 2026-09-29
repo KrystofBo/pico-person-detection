@@ -19,7 +19,7 @@
 // EXTENDED_OPS trades flash and SRAM for the three operators MobileNetV3 needs.
 // Off by default: a MobileNet v1 model uses none of them, and enabling it costs
 // ~30 KB of flash and ~50 KB of SRAM for nothing. The person_detect_*_custom
-// targets turn it on, since a generated model may be either architecture.
+// targets turn it on unless configured with -DCUSTOM_EXTENDED_OPS=OFF.
 #ifndef EXTENDED_OPS
 #define EXTENDED_OPS 0
 #endif

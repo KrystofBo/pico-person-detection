@@ -25,7 +25,7 @@
 // EXTENDED_OPS trades flash and SRAM for the three operators MobileNetV3 needs.
 // Off by default: a MobileNet v1 model uses none of them, and enabling it costs
 // ~30 KB of flash and ~50 KB of SRAM for nothing. The person_detect_*_custom
-// targets turn it on, since a generated model may be either architecture.
+// targets turn it on unless configured with -DCUSTOM_EXTENDED_OPS=OFF.
 #ifndef EXTENDED_OPS
 #define EXTENDED_OPS 0
 #endif
@@ -75,6 +75,14 @@ static void wait_for_magic() {
 int main() {
     stdio_init_all();
 
+    // Unchecked, a model larger than the buffer overwrites whatever follows it.
+    if ((size_t)g_person_detect_model_data_len > sizeof(model_sram)) {
+        while (true) {
+            printf("ERR model_too_large need=%d have=%u\n", g_person_detect_model_data_len,
+                   (unsigned)sizeof(model_sram));
+            sleep_ms(2000);
+        }
+    }
     memcpy(model_sram, g_person_detect_model_data, g_person_detect_model_data_len);
     const tflite::Model* model = tflite::GetModel(model_sram);
 
