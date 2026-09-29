@@ -4,9 +4,12 @@
 // Protocol
 //   host -> pico : 'P','I','M','G' then kInputBytes raw int8 pixels
 //   pico -> host : one text line, either
-//                    OK person=<int8> no_person=<int8> time=<us>
+//                    OK person=<int8> no_person=<int8> time=<us> verdict=<person|no_person>
 //                  or
 //                    ERR <reason>
+//
+// The verdict is the argmax of the two scores, so a tie is not a person, and
+// the onboard LED shows it: on while the latest frame contains a person.
 //
 // Binary one way, text the other, deliberately: the SDK's USB stdio translates
 // \n to \r\n on output but leaves input alone, so a binary reply would be
@@ -66,6 +69,8 @@ static void wait_for_magic() {
     while (matched < 4) {
         int c = getchar_timeout_us(1000 * 1000);
         if (c == PICO_ERROR_TIMEOUT) {
+            // No frame for a second: the last verdict is stale, stop showing it.
+            gpio_put(PICO_DEFAULT_LED_PIN, false);
             continue;
         }
         matched = (c == kMagic[matched]) ? matched + 1 : (c == kMagic[0] ? 1 : 0);
@@ -74,6 +79,8 @@ static void wait_for_magic() {
 
 int main() {
     stdio_init_all();
+    gpio_init(PICO_DEFAULT_LED_PIN);
+    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
 
     // Unchecked, a model larger than the buffer overwrites whatever follows it.
     if ((size_t)g_person_detect_model_data_len > sizeof(model_sram)) {
@@ -141,7 +148,11 @@ int main() {
             continue;
         }
 
-        printf("OK person=%d no_person=%d time=%llu\n", output->data.int8[kPersonIndex],
-               output->data.int8[kNotAPersonIndex], elapsed_us);
+        const int8_t person = output->data.int8[kPersonIndex];
+        const int8_t no_person = output->data.int8[kNotAPersonIndex];
+        const bool is_person = person > no_person;
+        gpio_put(PICO_DEFAULT_LED_PIN, is_person);
+        printf("OK person=%d no_person=%d time=%llu verdict=%s\n", person, no_person, elapsed_us,
+               is_person ? "person" : "no_person");
     }
 }

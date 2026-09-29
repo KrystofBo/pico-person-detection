@@ -26,6 +26,12 @@ REPLY_TIMEOUT_S = 10.0
 
 def send_frame(port: serial.Serial, tensor: np.ndarray) -> tuple[int, int, int]:
     """-> (person, no_person, device microseconds). Raises on a bad reply."""
+    fields = exchange(port, tensor)
+    return int(fields["person"]), int(fields["no_person"]), int(fields["time"])
+
+
+def exchange(port: serial.Serial, tensor: np.ndarray) -> dict[str, str]:
+    """Send one frame -> every field of the reply: person, no_person, time, verdict."""
     payload = tensor.astype(np.int8).tobytes()
     if len(payload) != model_io.INPUT_H * model_io.INPUT_W:
         raise ValueError(f"expected {model_io.INPUT_H * model_io.INPUT_W} bytes, got {len(payload)}")
@@ -38,8 +44,7 @@ def send_frame(port: serial.Serial, tensor: np.ndarray) -> tuple[int, int, int]:
         if not line:
             continue
         if line.startswith("OK "):
-            fields = dict(kv.split("=", 1) for kv in line[3:].split())
-            return int(fields["person"]), int(fields["no_person"]), int(fields["time"])
+            return dict(kv.split("=", 1) for kv in line[3:].split())
         if line.startswith("ERR"):
             raise RuntimeError(f"device error: {line}")
         # READY banner or leftover noise: ignore and keep waiting.
