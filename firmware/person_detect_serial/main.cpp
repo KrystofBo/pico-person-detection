@@ -50,13 +50,19 @@ constexpr int kInputBytes = kNumCols * kNumRows * kNumChannels;
 // flight a stall means the host died mid-send and we should resynchronise.
 constexpr uint32_t kFrameByteTimeoutUs = 2 * 1000 * 1000;
 
+// Reads whatever the USB FIFO holds per call - up to 64 bytes at full speed -
+// rather than one getchar_timeout_us() per byte. The FIFO is all the device can
+// buffer, so the host can only send the next packet once it is drained, and
+// draining it a byte at a time made moving a frame cost ~56 ms.
 static bool read_exact(int8_t* dst, int count) {
-    for (int i = 0; i < count; i++) {
-        int c = getchar_timeout_us(kFrameByteTimeoutUs);
-        if (c == PICO_ERROR_TIMEOUT) {
+    char* buf = reinterpret_cast<char*>(dst);
+    while (count > 0) {
+        int n = stdio_get_until(buf, count, make_timeout_time_us(kFrameByteTimeoutUs));
+        if (n == PICO_ERROR_TIMEOUT) {
             return false;
         }
-        dst[i] = (int8_t)(uint8_t)c;
+        buf += n;
+        count -= n;
     }
     return true;
 }
