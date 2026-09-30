@@ -111,7 +111,8 @@ read normally - both tested.
 endpoint buffer, one packet per USB transfer. At 512 bytes a transfer carries eight: the frame arrives in
 19 transfers, 8.8 ms on the Pico and 10.1 ms to send, against 7.6 ms for full-speed USB at its maximum
 of 19 packets per millisecond. TinyUSB re-arms the endpoint only while the FIFO has a whole transfer free
-(`cdc_device.c`), so the FIFO holds two - 1 KB, which measured as fast as 4 KB. Cost: 1,856 B of SRAM.
+(`cdc_device.c`), so the FIFO holds two - 1 KB, which measured as fast as 4 KB. Cost: 1,856 B of SRAM,
+which takes MCUNet's headroom from 19 KB to 17 KB (506,604 of 524,288 bytes used).
 Rechecked afterwards: bit-exact on the 100 test images, and a cut-off frame still recovers.
 
 **Uncompressed video does not survive usbipd** (table above); MJPEG does.

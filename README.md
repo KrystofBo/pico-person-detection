@@ -60,12 +60,12 @@ mean over the same 100 test images, all three measured in one session.
 The model is 7.16 M MACs (MobileNet v1, α=0.25). Latency was 190.4 ms as first measured in step 02;
 [fix/02-inference-latency](docs/journal/02-tflm-embedded.md#fix-inference-latency--190-ms--99-ms) brought it to 98.9 ms
 (1.92×) by splitting the CMSIS-NN kernels across both cores and copying the model into SRAM, with bit-identical outputs.
-SRAM use is 411,456 of the 524,288 bytes that hold data (the chip's other 8 KB are the two cores' stacks). That 98.9 ms came from the profile firmware, whose per-operator timing reads
+SRAM use is 413,312 of the 524,288 bytes that hold data (the chip's other 8 KB are the two cores' stacks). That 98.9 ms came from the profile firmware, whose per-operator timing reads
 0.3-0.4 ms higher than the serial firmware in the table.
 
 Our models are trained from scratch on 80,000 Wake Vision images (step 04). v1 is the baseline's architecture and ties
 it. MCUNet beats it by 1.9 points (paired test, p = 1.2e-4) at twice the latency; it needs the firmware built with
-`EXTENDED_OPS` and leaves 19 KB of SRAM free, against 110 KB for v1.
+`EXTENDED_OPS` and leaves 17 KB of SRAM free, against 108 KB for v1.
 
 Live (step 05), the laptop's webcam streams to the Pico, which answers person / no person over USB and on its LED.
 With v1: **8.4 fps, 129 ms from capture to verdict**, and the Pico's scores match the host reference bit-exactly
