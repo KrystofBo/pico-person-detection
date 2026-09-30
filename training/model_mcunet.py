@@ -30,8 +30,8 @@ Measured arena on device is ~180 KB against MobileNet v1's 82,308. So alpha only
 shrinks the weights, and they have to shrink enough that weights plus a fixed
 ~180 KB arena fit in 520 KB of SRAM.
 
-At 0.6 the trained model is 301,960 bytes and runs in SRAM with 19 KB to spare
-(504,748 of the 524,288 bytes that hold data); 0.7 is 356,288 and does not fit.
+At 0.6 the trained model is 301,960 bytes and runs in SRAM with 17 KB to spare
+(506,604 of the 524,288 bytes that hold data); 0.7 is 356,288 and does not fit.
 The cost is capacity: 167,098 weights against v1's 207,968, so this is not a
 like-for-like comparison.
 

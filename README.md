@@ -10,7 +10,8 @@ Person / no-person image classification running on a **Raspberry Pi Pico 2** (RP
 > example, which we vendored; "detection" there means detecting *presence*.
 > Accordingly the metrics are accuracy / precision / recall, never mAP or IoU.
 
-There's no camera yet — images are either embedded in the firmware or streamed from the host over USB serial (step 03).
+There's no camera on the Pico yet — images are embedded in the firmware, streamed from the host over USB serial (step 03),
+or streamed live from the laptop's webcam (step 05).
 The plan is to first run an existing model (TensorFlow Lite Micro person detection) to prove the pipeline end to end,
 then train our own model that fits the Pico's memory.
 
@@ -25,6 +26,8 @@ existing journal entry, so the corrected numbers sit next to the baseline they s
   [01-toolchain-hello](docs/journal/01-toolchain-hello.md).
 - **Host Python**: the conda env `pico-person-detection` (Python 3.12), specified in `environment.yml`.
   See the `python-env` skill.
+- **Live webcam demo** (step 05): attaching the webcam, flashing the main model and running
+  `tools/webcam_pico.py` are in the `live-webcam` skill.
 - **`third_party/pico-tflmicro` is patched at build time** from `third_party/patches/`, so its working tree
   always shows as modified while the submodule itself stays pinned to an upstream commit. That is expected —
   don't commit the pointer change, and don't `git submodule update --force`.
@@ -38,7 +41,7 @@ existing journal entry, so the corrected numbers sit next to the baseline they s
 | 02 | External model: TFLM person detection, embedded images | done | [02-tflm-embedded](docs/journal/02-tflm-embedded.md) |
 | 03 | Host reference + USB image streaming | done | [03-host-reference-streaming](docs/journal/03-host-reference-streaming.md) |
 | 04 | Train our own model (host) | done | [04-train-our-model](docs/journal/04-train-our-model.md) |
-| 05 | Live laptop webcam: frames preprocessed to 96×96 greyscale, streamed to the Pico, which answers person / no person | planned | |
+| 05 | Live laptop webcam: frames preprocessed to 96×96 greyscale, streamed to the Pico, which answers person / no person | done | [05-live-webcam](docs/journal/05-live-webcam.md) |
 
 ## Results
 
@@ -57,12 +60,16 @@ mean over the same 100 test images, all three measured in one session.
 The model is 7.16 M MACs (MobileNet v1, α=0.25). Latency was 190.4 ms as first measured in step 02;
 [fix/02-inference-latency](docs/journal/02-tflm-embedded.md#fix-inference-latency--190-ms--99-ms) brought it to 98.9 ms
 (1.92×) by splitting the CMSIS-NN kernels across both cores and copying the model into SRAM, with bit-identical outputs.
-SRAM use is 411,456 of the 524,288 bytes that hold data (the chip's other 8 KB are the two cores' stacks). That 98.9 ms came from the profile firmware, whose per-operator timing reads
+SRAM use is 413,312 of the 524,288 bytes that hold data (the chip's other 8 KB are the two cores' stacks). That 98.9 ms came from the profile firmware, whose per-operator timing reads
 0.3-0.4 ms higher than the serial firmware in the table.
 
 Our models are trained from scratch on 80,000 Wake Vision images (step 04). v1 is the baseline's architecture and ties
 it. MCUNet beats it by 1.9 points (paired test, p = 1.2e-4) at twice the latency; it needs the firmware built with
-`EXTENDED_OPS` and leaves 19 KB of SRAM free, against 110 KB for v1.
+`EXTENDED_OPS` and leaves 17 KB of SRAM free, against 108 KB for v1.
+
+Live (step 05), the laptop's webcam streams to the Pico, which answers person / no person over USB and on its LED.
+With v1: **8.4 fps, 129 ms from capture to verdict**, and the Pico's scores match the host reference bit-exactly
+on live frames.
 
 Since step 03 the Pico's scores can be checked against a host reference running the same `.tflite`:
 they agree **exactly** on all 12 inputs tested (`results/step03-samples.csv`). Accuracy is measured on a

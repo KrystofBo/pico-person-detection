@@ -51,11 +51,32 @@ endforeach()
 # tests and examples are only defined, not built.
 add_subdirectory(../third_party/pico-tflmicro pico-tflmicro EXCLUDE_FROM_ALL)
 
-# The *_custom targets link a generated model. v3 and mcunet need EXTENDED_OPS;
-# v1 needs none of its operators and is too large for the model buffer it leaves,
-# so a v1 model is built with -DCUSTOM_EXTENDED_OPS=OFF (tools/check_ops.py says
-# which a model needs). Cached, so set it explicitly whenever the model changes.
-option(CUSTOM_EXTENDED_OPS "Build the *_custom targets with EXTENDED_OPS=1" ON)
+# The *_custom targets embed a trained model in place of pico-tflmicro's: the main
+# one by default, or -DCUSTOM_MODEL=<path to .tflite>. The build converts it to a
+# C array, and converts it again whenever the file changes.
+set(CUSTOM_MODEL ${CMAKE_CURRENT_LIST_DIR}/../models/v1-80k.tflite
+    CACHE FILEPATH "The .tflite the *_custom targets embed")
+
+# v3 and MCUNet need ADD, MUL and HARD_SWISH, and EXTENDED_OPS also makes room for
+# their larger arena, which leaves a model buffer too small for v1.
+# tools/check_ops.py says which a model needs. Both settings are cached, so
+# change them together.
+option(CUSTOM_EXTENDED_OPS "Build the *_custom targets with EXTENDED_OPS=1" OFF)
+message(STATUS "*_custom targets: ${CUSTOM_MODEL}, CUSTOM_EXTENDED_OPS=${CUSTOM_EXTENDED_OPS}")
+
+# Adds CUSTOM_MODEL, converted to a C array, to a firmware target's sources.
+# tools/tflite_to_c.py uses only the standard library, so any python3 will do.
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+set(TFLITE_TO_C ${CMAKE_CURRENT_LIST_DIR}/../tools/tflite_to_c.py)
+function(target_embed_custom_model target)
+    set(source ${CMAKE_CURRENT_BINARY_DIR}/model_data.cpp)
+    add_custom_command(
+        OUTPUT ${source}
+        COMMAND Python3::Interpreter ${TFLITE_TO_C} ${CUSTOM_MODEL} -o ${source}
+        DEPENDS ${CUSTOM_MODEL} ${TFLITE_TO_C}
+    )
+    target_sources(${target} PRIVATE ${source})
+endfunction()
 
 add_subdirectory(hello)
 add_subdirectory(person_detect_embedded)
