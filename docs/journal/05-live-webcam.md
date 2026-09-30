@@ -79,17 +79,18 @@ the camera; the rest is measured.
 
 Latency on the live webcam, v1:
 
-| | byte-at-a-time read | block read |
-|---|---|---|
-| frames per second | 6.0 | **7.8** |
-| capture to verdict | 186 ms | **152 ms** |
-| round trip: send, infer, reply | 155.5 ms | 118.4 ms |
-| of which Pico inference | 98.5 ms | 98.6 ms |
-| of which moving the frame and reply | 56.3 ms | 20.1 ms |
+| | byte-at-a-time read | block read | 512-byte USB transfers |
+|---|---|---|---|
+| frames per second | 6.0 | 7.8 | **8.4** |
+| capture to verdict | 186 ms | 152 ms | **129 ms** |
+| round trip: send, infer, reply | 155.5 ms | 118.4 ms | 109.7 ms |
+| of which Pico inference | 98.5 ms | 98.6 ms | 98.5 ms |
+| of which moving the frame and reply | 56.3 ms | 20.1 ms | 11.2 ms |
 
-All rows but the last are the tool's own summaries over 60 s and 30 s; the last sends one fixed frame 40
-times, the same with the camera closed or streaming. Of the 152 ms, inference is 99, the link 20, and the remaining ~33 is the frame's age
-when it is sent - the camera delivers one every 60 ms - plus preprocessing.
+The first three rows are the tool's own summaries over 60, 30 and 30 s; the last two send one fixed frame
+40 times, the same with the camera closed or streaming. Of the final 129 ms, inference is 98.5, the link
+11, and the remaining ~19 is the frame's age when it is sent - the camera delivers one every 60 ms - plus
+preprocessing.
 
 ## Problems & fixes
 
@@ -99,6 +100,15 @@ once it is drained; the firmware drained it with one `getchar_timeout_us()` per 
 through the stdio drivers. `stdio_get_until()` returns whatever is buffered, and the cost fell to
 20.1 ms. A frame that stalls mid-send still fails after 2 s with `ERR short_frame`, and the next frame is
 read normally - both tested.
+
+**That left 20 ms, and the obvious next fix did nothing.** Enlarging the receive FIFO from 64 bytes to
+4 KB: 19.1 ms to send, as before. Logging the receive loop on the Pico showed why: the frame arrived as
+145 single 64-byte packets, one about every 120 us, never more than one waiting. The limit was the
+endpoint buffer, one packet per USB transfer. At 512 bytes a transfer carries eight: the frame arrives in
+19 transfers, 8.8 ms on the Pico and 10.1 ms to send, against 7.6 ms for full-speed USB at its maximum
+of 19 packets per millisecond. TinyUSB re-arms the endpoint only while the FIFO has a whole transfer free
+(`cdc_device.c`), so the FIFO holds two - 1 KB, which measured as fast as 4 KB. Cost: 1,856 B of SRAM.
+Rechecked afterwards: bit-exact on the 100 test images, and a cut-off frame still recovers.
 
 **Uncompressed video does not survive usbipd** (table above); MJPEG does.
 
@@ -114,7 +124,7 @@ importing cv2, and the warning is gone.
 
 ## Next
 
-- The remaining 20 ms on the link: the 64-byte FIFO is TinyUSB's full-speed default, and a larger one
-  might cut it further. Untested.
+- The link is down to 11 ms, near full-speed USB's floor. Sending the next frame while the Pico infers
+  would hide it entirely - about 10 fps - but each verdict would then be about a frame ~100 ms older.
 - MCUNet is one rebuild away (`-DCUSTOM_EXTENDED_OPS=ON`, step 04): +1.9 points on test, at an
-  estimated 4.4 fps: its 198.8 ms of inference plus the same 30 ms of link and laptop work per frame.
+  estimated 4.6 fps: its 198.8 ms of inference plus the same 20 ms of link and laptop work per frame.

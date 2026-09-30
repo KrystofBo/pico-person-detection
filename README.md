@@ -68,7 +68,7 @@ it. MCUNet beats it by 1.9 points (paired test, p = 1.2e-4) at twice the latency
 `EXTENDED_OPS` and leaves 19 KB of SRAM free, against 110 KB for v1.
 
 Live (step 05), the laptop's webcam streams to the Pico, which answers person / no person over USB and on its LED.
-With v1: **7.8 fps, 152 ms from capture to verdict**, and the Pico's scores match the host reference bit-exactly
+With v1: **8.4 fps, 129 ms from capture to verdict**, and the Pico's scores match the host reference bit-exactly
 on live frames.
 
 Since step 03 the Pico's scores can be checked against a host reference running the same `.tflite`:
