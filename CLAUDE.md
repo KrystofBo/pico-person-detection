@@ -113,4 +113,6 @@ Repeatable procedures (building, flashing, reading serial, ...) are project skil
 - Small, focused commits: imperative subject, body explains *why*.
 - Each step adds `docs/journal/NN-title.md` (Goal, What we did, Commands, Results, Problems & fixes, Next) and updates the progress table in `README.md`.
 - End of step: summarize the diff for review, merge to `main` with `--no-ff`, tag `step-NN`. Never push unless asked.
+- When asked to push, push every branch and tag, not just the one named, so origin mirrors the local repo
+  and no branch there lags its merge - see the `push-to-origin` skill.
 - Record real measured numbers (latency, flash, arena, accuracy) in the journal and the README results table - no estimates presented as measurements.
