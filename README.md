@@ -41,7 +41,7 @@ existing journal entry, so the corrected numbers sit next to the baseline they s
 | 02 | External model: TFLM person detection, embedded images | done | [02-tflm-embedded](docs/journal/02-tflm-embedded.md) |
 | 03 | Host reference + USB image streaming | done | [03-host-reference-streaming](docs/journal/03-host-reference-streaming.md) |
 | 04 | Train our own model (host) | done | [04-train-our-model](docs/journal/04-train-our-model.md) |
-| 05 | Live laptop webcam: frames preprocessed to 96×96 greyscale, streamed to the Pico, which answers person / no person | in progress | [05-live-webcam](docs/journal/05-live-webcam.md) |
+| 05 | Live laptop webcam: frames preprocessed to 96×96 greyscale, streamed to the Pico, which answers person / no person | done | [05-live-webcam](docs/journal/05-live-webcam.md) |
 
 ## Results
 
