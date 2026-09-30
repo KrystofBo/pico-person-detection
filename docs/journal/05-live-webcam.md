@@ -44,16 +44,20 @@ so the firmware builds from any checkout. The C array is still generated from it
 
 ## Commands
 
+The `live-webcam` skill holds the full procedure, with troubleshooting.
+
 ```bash
 # Windows, admin PowerShell. Bus id from `usbipd list`; bind once, attach per session.
 usbipd bind --busid 1-12
 usbipd attach --wsl --busid 1-12       # Windows loses the camera until: usbipd detach --busid 1-12
 
 # Firmware with the main model: the base five operators (pico-build-flash skill)
+export PICO_TOOLCHAIN_PATH=$HOME/opt/arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi
+conda activate pico-person-detection
 python tools/tflite_to_c.py models/v1-80k.tflite -o firmware/generated/model_data.cpp
 cmake -S firmware -B firmware/build -Dpicotool_DIR=$HOME/opt/picotool/lib/cmake/picotool -DCUSTOM_EXTENDED_OPS=OFF
 cmake --build firmware/build -j8 --target person_detect_serial_custom
-picotool load -f -x firmware/build/person_detect_serial/person_detect_serial_custom.uf2
+~/opt/picotool/bin/picotool load -f -x firmware/build/person_detect_serial/person_detect_serial_custom.uf2
 
 python tools/webcam_pico.py
 ```

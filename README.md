@@ -26,6 +26,8 @@ existing journal entry, so the corrected numbers sit next to the baseline they s
   [01-toolchain-hello](docs/journal/01-toolchain-hello.md).
 - **Host Python**: the conda env `pico-person-detection` (Python 3.12), specified in `environment.yml`.
   See the `python-env` skill.
+- **Live webcam demo** (step 05): attaching the webcam, flashing the main model and running
+  `tools/webcam_pico.py` are in the `live-webcam` skill.
 - **`third_party/pico-tflmicro` is patched at build time** from `third_party/patches/`, so its working tree
   always shows as modified while the submodule itself stays pinned to an upstream commit. That is expected —
   don't commit the pointer change, and don't `git submodule update --force`.
