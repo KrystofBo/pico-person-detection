@@ -103,8 +103,10 @@ empty room's image far darker and flatter than the training data: mean brightnes
 images' 118, darker than 95% of them, with a third of their contrast. With someone in view the model
 finds them, but that gap is the first suspect if it misses a person in poor light.
 
-On start, Qt prints `QFontDatabase: Cannot find font directory`: OpenCV's wheel ships no fonts for the
-window decorations. Harmless; the overlay uses OpenCV's own.
+**Qt warned `QFontDatabase: Cannot find font directory` on every start.** Importing cv2 points Qt at a
+font directory the wheel does not ship (`cv2/config-3.py`), overwriting any value set beforehand. Qt only
+reads it when the first window opens, so the tool now sets it to the system's DejaVu fonts after
+importing cv2, and the warning is gone.
 
 ## Next
 

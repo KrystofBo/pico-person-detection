@@ -14,6 +14,7 @@ and the frame rate. q, Esc or closing the window stops it and prints a summary.
 from __future__ import annotations
 
 import argparse
+import os
 import statistics
 import threading
 import time
@@ -28,6 +29,13 @@ from stream_pico import exchange
 
 WINDOW = "Pico person detection"
 GREEN, GREY = (0, 200, 0), (200, 200, 200)
+
+# Importing cv2 points Qt at a font directory the wheel does not ship
+# (cv2/config-3.py), and Qt warns about it on every start. Qt reads the
+# variable when the first window opens, so overriding it here still works.
+SYSTEM_FONTS = "/usr/share/fonts/truetype/dejavu"
+if os.path.isdir(SYSTEM_FONTS):
+    os.environ["QT_QPA_FONTDIR"] = SYSTEM_FONTS
 
 
 class LatestFrame:
