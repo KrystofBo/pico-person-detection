@@ -39,8 +39,12 @@ after a second without frames, so a stale verdict is not left lit. The reply onl
   P(person), the Pico's inference time and the frame rate. q, Esc, Ctrl+C or closing the window stops it
   and prints a timing summary.
 
-**The main model is in the repo**: `models/v1-80k.tflite`, 303,552 B, byte-identical to step 04's run 6,
-so the firmware builds from any checkout. The C array is still generated from it.
+**The main model is in the repo**, `models/v1-80k.tflite`, 303,552 B, byte-identical to step 04's run 6,
+**and the firmware builds straight from it.** The `*_custom` targets take `-DCUSTOM_MODEL=<.tflite>`,
+defaulting to the main model, and the build converts it to a C array itself, again whenever the file
+changes. Before, a hand-run `tools/tflite_to_c.py` wrote a gitignored file: the build embedded whatever it
+held, and the targets existed only once it did. The firmware comes out byte-identical either way, checked
+for both custom targets and from a fresh build directory.
 
 ## Commands
 
@@ -53,12 +57,12 @@ usbipd attach --wsl --busid 1-12       # Windows loses the camera until: usbipd 
 
 # Firmware with the main model: the base five operators (pico-build-flash skill)
 export PICO_TOOLCHAIN_PATH=$HOME/opt/arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi
-conda activate pico-person-detection
-python tools/tflite_to_c.py models/v1-80k.tflite -o firmware/generated/model_data.cpp
-cmake -S firmware -B firmware/build -Dpicotool_DIR=$HOME/opt/picotool/lib/cmake/picotool -DCUSTOM_EXTENDED_OPS=OFF
+cmake -S firmware -B firmware/build -Dpicotool_DIR=$HOME/opt/picotool/lib/cmake/picotool \
+      -DCUSTOM_MODEL=models/v1-80k.tflite -DCUSTOM_EXTENDED_OPS=OFF
 cmake --build firmware/build -j8 --target person_detect_serial_custom
 ~/opt/picotool/bin/picotool load -f -x firmware/build/person_detect_serial/person_detect_serial_custom.uf2
 
+conda activate pico-person-detection
 python tools/webcam_pico.py
 ```
 
@@ -126,5 +130,5 @@ importing cv2, and the warning is gone.
 
 - The link is down to 11 ms, near full-speed USB's floor. Sending the next frame while the Pico infers
   would hide it entirely - about 10 fps - but each verdict would then be about a frame ~100 ms older.
-- MCUNet is one rebuild away (`-DCUSTOM_EXTENDED_OPS=ON`, step 04): +1.9 points on test, at an
+- MCUNet is one rebuild away (`-DCUSTOM_MODEL=<its .tflite> -DCUSTOM_EXTENDED_OPS=ON`, step 04): +1.9 points on test, at an
   estimated 4.6 fps: its 198.8 ms of inference plus the same 20 ms of link and laptop work per frame.

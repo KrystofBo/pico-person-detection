@@ -1,7 +1,9 @@
 """Turn a .tflite into a C array the firmware can embed.
 
-    python tools/tflite_to_c.py training/runs/<run>/model_int8.tflite \
-        -o firmware/generated/model_data.cpp
+    python tools/tflite_to_c.py model.tflite -o model_data.cpp
+
+The firmware build runs this itself for the *_custom targets, on CUSTOM_MODEL
+(firmware/CMakeLists.txt). Standard library only, so any python3 will do.
 
 Emits the same symbols pico-tflmicro's own model file declares, so a firmware
 target can link this instead of the baseline without touching any source:

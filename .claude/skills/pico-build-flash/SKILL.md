@@ -22,17 +22,18 @@ The configure step applies `third_party/patches/*.patch` to the pico-tflmicro su
 - `git submodule update --force` or a submodule bump reverts/breaks the patches. Re-run the configure step to reapply; if it fails with "the patches need rebasing", regenerate them against the new commit.
 
 ### Our own models: the `*_custom` targets
-`python tools/tflite_to_c.py <model>.tflite -o firmware/generated/model_data.cpp` writes the model. The
-`*_custom` targets exist only once that file does, so configure after writing it, choosing the layout the
-model needs (`tools/check_ops.py` says which):
+They embed `-DCUSTOM_MODEL=<.tflite>` - by default `models/v1-80k.tflite`, the main model; a relative path
+is taken from where cmake runs - converted to C during the build, and again whenever the file changes.
+`-DCUSTOM_EXTENDED_OPS` must match the model (`tools/check_ops.py` says which):
 
 | `-DCUSTOM_EXTENDED_OPS=` | operators | arena | model buffer | for |
 |---|---|---|---|---|
-| `ON` (default) | the base five + ADD, MUL, HARD_SWISH | 184 KB | 296 KB | v3, MCUNet |
-| `OFF` | the base five | 88 KB | 301 KB | v1 |
+| `OFF` (default) | the base five | 88 KB | 301 KB | v1 |
+| `ON` | the base five + ADD, MUL, HARD_SWISH | 184 KB | 296 KB | v3, MCUNet |
 
-The setting is cached in the build directory, so pass it on every configure that changes the model. A
-mismatch stops the serial firmware with `ERR model_too_large` or `ERR allocate_tensors` instead of running.
+Both settings are cached in the build directory: pass them together whenever the model changes, or
+`-UCUSTOM_MODEL -UCUSTOM_EXTENDED_OPS` to return to the defaults. A mismatch stops the serial firmware with
+`ERR model_too_large` or `ERR allocate_tensors` instead of running.
 
 ## 2. Flash
 ```bash

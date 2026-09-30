@@ -25,19 +25,19 @@ node and delivers no frames.
 ## 2. Flash the firmware - only if the Pico runs something else
 
 Its flash keeps the last program, so this is needed only after flashing a different one. The main model on
-the base five operators; the `pico-build-flash` skill explains the `*_custom` targets.
+the base five operators, named explicitly because both settings stay cached in the build directory; the
+`pico-build-flash` skill explains the `*_custom` targets.
 
 ```bash
 export PICO_TOOLCHAIN_PATH=$HOME/opt/arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi
-PY=/home/krystof/miniconda3/envs/pico-person-detection/bin/python
-$PY tools/tflite_to_c.py models/v1-80k.tflite -o firmware/generated/model_data.cpp
-cmake -S firmware -B firmware/build -Dpicotool_DIR=$HOME/opt/picotool/lib/cmake/picotool -DCUSTOM_EXTENDED_OPS=OFF
+cmake -S firmware -B firmware/build -Dpicotool_DIR=$HOME/opt/picotool/lib/cmake/picotool \
+      -DCUSTOM_MODEL=models/v1-80k.tflite -DCUSTOM_EXTENDED_OPS=OFF
 cmake --build firmware/build -j8 --target person_detect_serial_custom
 ~/opt/picotool/bin/picotool load -f -x firmware/build/person_detect_serial/person_detect_serial_custom.uf2
 ```
 
-MCUNet instead: its `.tflite` from `training/runs/run8-mcunet-80k-*/` and `-DCUSTOM_EXTENDED_OPS=ON`, at
-roughly half the frame rate.
+MCUNet instead, at roughly half the frame rate:
+`-DCUSTOM_MODEL=training/runs/run8-mcunet-80k-20260928-202517/model_int8.tflite -DCUSTOM_EXTENDED_OPS=ON`.
 
 ## 3. Run
 
